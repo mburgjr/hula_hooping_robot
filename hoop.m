@@ -15,6 +15,7 @@ b = R_hoop/2; % m
 dth = 2*pi; % rad/sec
 
 %% Forward simulation
+% From person to hoop
 
 t_lim = [0; 3];
 dt = 0.01;
@@ -74,6 +75,7 @@ for i = 2:N
 end
 
 %% Backward simulation
+% From hoop to person
 
 % TODO? Lol
 
