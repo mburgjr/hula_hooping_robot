@@ -24,9 +24,9 @@ N = length(t);
 
 % Generate ellipse
 ang = t*dth;
-p_person = [a*cos(ang);     b*sin(ang)];
-v_person = [-a*sin(ang);    b*cos(ang)]*dth;
-a_person = [-a*cos(ang);    -b*sin(ang)]*dth*dth;
+p_person = [a*cos(ang);     b*sin(ang)];            % [x, y] X N
+v_person = [-a*sin(ang);    b*cos(ang)]*dth;        % [dx, dy] X N
+a_person = [-a*cos(ang);    -b*sin(ang)]*dth*dth;   % [ddx, ddy] X N
 
 % Init hoop states
 p_hoop = zeros([3 N]);      % [x, y, phi] x N
