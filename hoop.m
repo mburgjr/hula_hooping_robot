@@ -10,9 +10,9 @@ R_person = 0.01; % m
 mu_person = 0.1; % [/]
 
 % Elliptical input
-a = R_hoop/2; % m
-b = R_hoop/2; % m
-dth = 2*pi; % rad/sec
+a = R_hoop/2; % m       Length of x-axis limits
+b = R_hoop/2; % m       Length of y-axis limits
+dth = 2*pi; % rad/sec   Traversal speed
 
 %% Forward simulation
 % From person to hoop
