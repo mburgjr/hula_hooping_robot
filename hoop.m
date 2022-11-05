@@ -3,11 +3,11 @@
 % Hoop
 m_hoop = 1; % kg
 R_hoop = 0.24; % m
-I_hoop = m_hoop*r_hoop^2;
+I_hoop = m_hoop*R_hoop^2;
 
 % Person
 R_person = 0.01; % m
-mu_person = 0.1; % [/]
+mu = 0.1; % [/]
 
 % Elliptical input
 a = R_hoop/2; % m       Length of x-axis limits
@@ -28,6 +28,21 @@ p_person = [a*cos(ang);     b*sin(ang)];            % [x, y] X N
 v_person = [-a*sin(ang);    b*cos(ang)]*dth;        % [dx, dy] X N
 a_person = [-a*cos(ang);    -b*sin(ang)]*dth*dth;   % [ddx, ddy] X N
 
+
+
+
+
+% State
+
+% [th, r, dth, dr] of hoop
+
+% Start here:
+% Fix contact point
+% Choose force within friction cone
+
+
+
+
 % Init hoop states
 p_hoop = zeros([3 N]);      % [x, y, phi] x N
 v_hoop = zeros([3 N]);      % [dx, dy, dphi] x N
@@ -36,7 +51,7 @@ v_hoop = zeros([3 N]);      % [dx, dy, dphi] x N
 p_hoop(1:2, 1) = p_person(:,1) + [R_person - R_hoop; 0];
 
 % Iterate for timesteps
-for i = 2:N
+for i = 1:N
 
 
 
@@ -55,22 +70,28 @@ for i = 2:N
 
 
     % Find contact point, assuming contact
-    HP = p_person(:,i) - p_hoop(1:2,i);
-    HP_hat = HP / norm(HP);
-    contact_point = R_hoop*HP_hat + p_hoop(1:2,i);
+    % HP = p_person(:,i) - p_hoop(1:2,i);
+    % HP_hat = HP / norm(HP);
+    % contact_point = R_hoop*HP_hat + p_hoop(1:2,i);
 
     % Force calc
-    F_c = m_hoop * a_person(:,i);
+    % F_c = m_hoop * a_person(:,i);
+
+
+    phi = p_hoop(3, i);
+    F_c = [10*cos(phi); 10*sin(phi)];
+
+
 
     % Moment calc
-    tau_c = 0;
+    tau_c = mu*10*R_hoop;
 
 
     
     % Update hoop state
-    v_hoop(1:2, i) = dt*F_c/m_hoop + v_hoop(1:2,i-1);
-    v_hoop(3, i) = dt*tau_c/I_hoop + v_hoop(3,i-1);
-    p_hoop(:,i) = p_hoop(:,i-1) + dt*v_hoop(:,i);
+    v_hoop(1:2, i+1) = dt*F_c/m_hoop + v_hoop(1:2,i);
+    v_hoop(3, i+1) = dt*tau_c/I_hoop + v_hoop(3,i);
+    p_hoop(:, i+1) = p_hoop(:,i) + dt*v_hoop(:,i+1);
 
 end
 
