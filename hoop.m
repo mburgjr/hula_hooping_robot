@@ -12,8 +12,8 @@ mu = 0.1; % [/]
 % Elliptical input
 R_traj_person = R_hoop/2;
 R_traj_hoop = R_traj_person - R_person + R_hoop;
-a = R_traj; % m       Length of x-axis limits
-b = R_traj; % m       Length of y-axis limits
+a = R_traj_person; % m       Length of x-axis limits
+b = R_traj_person; % m       Length of y-axis limits
 dth = 2*pi; % rad/sec   Traversal speed
 
 %% Forward simulation
