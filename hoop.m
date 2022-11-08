@@ -38,17 +38,21 @@ p_hoop(3, 1) = pi;
 
 % Iterate for timesteps
 for i = 1:N
-    
 
+    % Forces zero without contact
     F_c = 0;
     tau_c = 0;
 
-    contact = false;
+    % Check if hoop and person are in contact
+    dist_btwn = norm(p_person(:, i) - p_hoop(1:2, i));
+    contact = (dist_btwn >= R_hoop - R_person) &&...
+                (dist_btwn <= R_hoop + R_person);
+
     if contact
+        % Apply force and torque to hoop if there's contact
         F_c = 0;
         tau_c = 0;
     end
-
 
     % Update hoop state
     v_hoop(1:2, i+1) = dt*F_c/m_hoop + v_hoop(1:2,i);
