@@ -6,13 +6,13 @@ R_hoop = 0.24; % m
 I_hoop = m_hoop*R_hoop^2;
 
 % Person
-R_person = 0.01; % m
+R_person = 0.03; % m
 mu = 0.1; % [/]
 
 % Elliptical input
 a = R_hoop/2; % m       Length of x-axis limits
 b = R_hoop/2; % m       Length of y-axis limits
-dth = 2*pi; % rad/sec   Traversal speed
+dth = 4*pi; % rad/sec   Traversal speed
 
 %% Forward simulation
 % From person to hoop
@@ -70,17 +70,17 @@ end
 
 % Plot trajectory
 hold on
-plot(p_person(1,:), p_person(2,:), 'k-', 'LineWidth', 1)
+plot(p_person(1,:), p_person(2,:), '-', 'LineWidth', 1, 'Color', [0.65 0.65 0.65])
 
 % Prepare plot handles
 h_hoop = plot([0],[0],'b-','LineWidth',2);
-h_person = plot([0],[0],'r-','LineWidth',2);
+h_person = fill([0],[0],'r-','LineStyle','none');
 
 xlabel('x'); ylabel('y');
 h_title = title('t=0.0s');
 
 axis equal
-axis([-0.5 0.5 -0.5 0.5]);
+axis([-0.75 0.75 -0.75 0.75]);
 
 % Precompute geometries
 th = 0:pi/50:2*pi;
@@ -90,7 +90,7 @@ hoop_circle_x = R_hoop*cos(th);
 hoop_circle_y = R_hoop*sin(th);
 
 % For visualization purposes
-sim_speed = 0.05;
+sim_speed = 1;
 
 % Step through and update animation
 for i = 1:N
