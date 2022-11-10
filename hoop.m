@@ -7,7 +7,7 @@ I_hoop = m_hoop*R_hoop^2;
 
 % Person
 R_person = 0.03; % m
-mu = 0.1; % [/]
+mu = 0.05; % [/]
 
 % Simulation
 t_lim = [0; 3];
@@ -17,11 +17,11 @@ N = length(t);
 
 % Spiral input
 % NOTE: Keep upper / lower equal for simple ellipse
-a_upper = R_hoop; % m       Initial radius on x-axis
+a_upper = R_hoop/2; % m       Initial radius on x-axis
 a_lower = R_hoop/10; % m    Final radius on x-axis
-b_upper = R_hoop; % m       Initial radius on y-axis
+b_upper = R_hoop/2; % m       Initial radius on y-axis
 b_lower = R_hoop/10; % m     Final radius on y-axis
-v_spiral = 5; % m/s         Traversal speed
+v_spiral = 3; % m/s         Traversal speed
 
 %% Generate spiral trajectory of person
 
@@ -30,12 +30,12 @@ b = [b_upper b_lower]; % Change of y-axis radius from start to end
 
 % Calculate radius change over axes
 dr_a = (a(2)-a(1)) / t_lim(2);
-a_radius = a(1) + dr_a*t;
+radius_a = a(1) + dr_a*t;
 dr_b = (b(2)-b(1)) / t_lim(2);
-b_radius = b(1) + dr_b*t;
+radius_b = b(1) + dr_b*t;
 
 % Calculate angle change
-r_spiral = (a_radius.^2 + b_radius.^2).^0.5;
+r_spiral = (radius_a.^2 + radius_b.^2).^0.5;
 dth_spiral = v_spiral*(r_spiral.^-1);
 th_spiral = zeros([1 N+1]);
 
@@ -45,16 +45,21 @@ a_person = zeros([2 N]);    % [ddx, ddy] x N
 
 % Iteratively calculate spiral trajectory
 for i = 1:N
+
+    r_a = radius_a(i);
+    r_b = radius_b(i);
+    th = th_spiral(i);
+    dth = dth_spiral(i);
     
-    p_person(:,i) = [ a_radius(i)*cos(th_spiral(i)) ;...
-                      b_radius(i)*sin(th_spiral(i)) ];
-    v_person(:,i) = [ dr_a*cos(th_spiral(i)) - a_radius(i)*sin(th_spiral(i))*dth_spiral(i) ;...
-                      dr_b*sin(th_spiral(i)) + b_radius(i)*cos(th_spiral(i))*dth_spiral(i) ];
-    a_person(:,i) = [ dr_a*sin(th_spiral(i))*dth_spiral(i) - dr_a*sin(th_spiral(i))*dth_spiral(i) - a_radius(i)*cos(th_spiral(i))*dth_spiral(i)^2 ;...
-                      dr_b*cos(th_spiral(i))*dth_spiral(i) + dr_b*cos(th_spiral(i))*dth_spiral(i) - b_radius(i)*sin(th_spiral(i))*dth_spiral(i)^2 ];
+    p_person(:,i) = [ r_a*cos(th) ;...
+                      r_b*sin(th) ];
+    v_person(:,i) = [ dr_a*cos(th) - r_a*sin(th)*dth ;...
+                      dr_b*sin(th) + r_b*cos(th)*dth ];
+    a_person(:,i) = [ -dr_a*sin(th)*dth - dr_a*sin(th)*dth - r_a*cos(th)*dth^2 ;...
+                      dr_b*cos(th)*dth + dr_b*cos(th)*dth - r_b*sin(th)*dth^2 ];
 
     % Update angle for next step
-    th_spiral(:, i+1) = th_spiral(i) + dt*dth_spiral(i);
+    th_spiral(:, i+1) = th + dt*dth;
 end
 
 %% Forward simulation
