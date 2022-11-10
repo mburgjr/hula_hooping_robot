@@ -1,7 +1,7 @@
 %% Parameters
 
 % Hoop
-m_hoop = 1; % kg
+m_hoop = 0.25; % kg
 R_hoop = 0.24; % m
 I_hoop = m_hoop*R_hoop^2;
 
@@ -18,7 +18,7 @@ dth = 4*pi; % rad/sec   Traversal speed
 % From person to hoop
 
 t_lim = [0; 3];
-dt = 0.01;
+dt = 0.001;
 t = t_lim(1):dt:t_lim(2);
 N = length(t);
 
@@ -36,35 +36,47 @@ v_hoop = zeros([3 N]);      % [dx, dy, dphi] x N
 p_hoop(1:2, 1) = p_person(:,1) + [-R_person + R_hoop; 0];
 p_hoop(3, 1) = pi;
 
-% Iterate for timesteps
-for i = 1:N
+F_contact = zeros([2 N]);
 
-    % Forces zero without contact
-    F_c = 0;
-    tau_c = 0;
+% Iterate for timesteps
+for i = 1:N-1
+
+    % Carry over velocity
+    v_hoop(:, i+1) = v_hoop(:,i);
 
     % Check if hoop and person are in contact
     dist_btwn = norm(p_person(:, i) - p_hoop(1:2, i));
     contact = (dist_btwn >= R_hoop - R_person) &&...
                 (dist_btwn <= R_hoop + R_person);
 
+    % Apply force and torque to hoop if there's contact
     if contact
-        % Apply force and torque to hoop if there's contact
-        F_c = 0;
+        % Planar collision
+        v_plus = v_person(:, i+1);
+        v_minus_hoop = v_hoop(1:2, i+1);
+
+        % Collision force acts normal to the hoop
+        normal = (p_person(:, i) - p_hoop(1:2, i)) / norm(p_person(:, i) - p_hoop(1:2, i));
+
+        % Difference in momentum
+        F_c = m_hoop*norm(v_plus - v_minus_hoop)*normal;
+
+        % TODO: Implement torque
         tau_c = 0;
+
+        % Tau is mu times normal component of F_c
+        v_hoop(1:2, i+1) = F_c/m_hoop + v_hoop(1:2, i+1);
+        v_hoop(3, i+1) = tau_c/I_hoop + v_hoop(3, i+1);
+
+        % Save contact force for viewing
+        F_contact(:,i) = F_c;
+        
     end
 
     % Update hoop state
-    v_hoop(1:2, i+1) = dt*F_c/m_hoop + v_hoop(1:2,i);
-    v_hoop(3, i+1) = dt*tau_c/I_hoop + v_hoop(3,i);
-    p_hoop(:, i+1) = p_hoop(:,i) + dt*v_hoop(:,i);
+    p_hoop(:, i+1) = p_hoop(:,i) + dt*v_hoop(:,i+1);
 
 end
-
-%% Backward simulation
-% From hoop to person
-
-% TODO? Lol
 
 %% Display
 
@@ -74,6 +86,7 @@ plot(p_person(1,:), p_person(2,:), '-', 'LineWidth', 1, 'Color', [0.65 0.65 0.65
 
 % Prepare plot handles
 h_hoop = plot([0],[0],'b-','LineWidth',2);
+h_contact = plot([0],[0],'m-','LineWidth',2);
 h_person = fill([0],[0],'r-','LineStyle','none');
 
 xlabel('x'); ylabel('y');
@@ -90,7 +103,7 @@ hoop_circle_x = R_hoop*cos(th);
 hoop_circle_y = R_hoop*sin(th);
 
 % For visualization purposes
-sim_speed = 1;
+sim_speed = 0.1;
 
 % Step through and update animation
 for i = 1:N
@@ -101,6 +114,14 @@ for i = 1:N
     
     set(h_hoop,'XData', hoop_circle_x + p_hoop(1,i));
     set(h_hoop,'YData', hoop_circle_y + p_hoop(2,i));
+
+    contact_hat = 0.1*F_contact(:,i)/norm(F_contact(:,i));
+    contact_vec_x = [0 contact_hat(1)];
+    contact_vec_y = [0 contact_hat(2)];
+    normal = (p_person(:, i) - p_hoop(1:2, i)) / norm(p_person(:, i) - p_hoop(1:2, i));
+    contact_point = p_hoop(1:2, i) + R_hoop*normal;
+    set(h_contact,'XData', contact_vec_x + contact_point(1));
+    set(h_contact,'YData', contact_vec_y + contact_point(2));
 
     pause(dt/sim_speed)
 end

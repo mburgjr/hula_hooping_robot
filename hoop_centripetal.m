@@ -18,7 +18,7 @@ dth = 2*pi; % rad/sec   Traversal speed
 % From person to hoop
 
 t_lim = [0; 3];
-dt = 0.01;
+dt = 0.001;
 t = t_lim(1):dt:t_lim(2);
 N = length(t);
 
@@ -61,7 +61,7 @@ for i = 1:N
     % Update hoop state
     v_hoop(1:2, i+1) = dt*F_c/m_hoop + v_hoop(1:2,i);
     v_hoop(3, i+1) = dt*tau_c/I_hoop + v_hoop(3,i);
-    p_hoop(:, i+1) = p_hoop(:,i) + dt*v_hoop(:,i);
+    p_hoop(:, i+1) = p_hoop(:,i) + dt*v_hoop(:,i+1);
 
 end
 
@@ -95,7 +95,7 @@ traj_circle_y = R_traj_hoop*sin(th);
 plot(traj_circle_x, traj_circle_y, 'k--')
 
 % For visualization purposes
-sim_speed = 0.05;
+sim_speed = 0.5;
 
 % Step through and update animation
 for i = 1:N
