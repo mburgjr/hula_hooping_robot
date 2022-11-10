@@ -16,6 +16,7 @@ t = t_lim(1):dt:t_lim(2);
 N = length(t);
 
 % Spiral input
+% NOTE: Keep upper / lower equal for simple ellipse
 a_upper = R_hoop; % m       Initial radius on x-axis
 a_lower = R_hoop/10; % m    Final radius on x-axis
 b_upper = R_hoop; % m       Initial radius on y-axis
