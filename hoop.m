@@ -1,7 +1,7 @@
 %% Parameters
 
 % Hoop
-m_hoop = 0.25; % kg
+m_hoop = 0.5; % kg
 R_hoop = 0.24; % m
 I_hoop = m_hoop*R_hoop^2;
 
@@ -9,24 +9,55 @@ I_hoop = m_hoop*R_hoop^2;
 R_person = 0.03; % m
 mu = 0.1; % [/]
 
-% Elliptical input
-a = R_hoop/2; % m       Length of x-axis limits
-b = R_hoop/2; % m       Length of y-axis limits
-dth = 4*pi; % rad/sec   Traversal speed
-
-%% Forward simulation
-% From person to hoop
-
+% Simulation
 t_lim = [0; 3];
 dt = 0.001;
 t = t_lim(1):dt:t_lim(2);
 N = length(t);
 
-% Generate ellipse
-ang = t*dth;
-p_person = [a*cos(ang);     b*sin(ang)];            % [x, y] X N
-v_person = [-a*sin(ang);    b*cos(ang)]*dth;        % [dx, dy] X N
-a_person = [-a*cos(ang);    -b*sin(ang)]*dth*dth;   % [ddx, ddy] X N
+% Spiral input
+a_upper = R_hoop; % m       Initial radius on x-axis
+a_lower = R_hoop/10; % m    Final radius on x-axis
+b_upper = R_hoop; % m       Initial radius on y-axis
+b_lower = R_hoop/10; % m     Final radius on y-axis
+v_spiral = 5; % m/s         Traversal speed
+
+%% Generate spiral trajectory of person
+
+a = [a_upper a_lower]; % Change of x-axis radius from start to end
+b = [b_upper b_lower]; % Change of y-axis radius from start to end
+
+% Calculate radius change over axes
+dr_a = (a(2)-a(1)) / t_lim(2);
+a_radius = a(1) + dr_a*t;
+dr_b = (b(2)-b(1)) / t_lim(2);
+b_radius = b(1) + dr_b*t;
+
+% Calculate angle change
+r_spiral = (a_radius.^2 + b_radius.^2).^0.5;
+dth_spiral = v_spiral*(r_spiral.^-1);
+th_spiral = zeros([1 N+1]);
+
+p_person = zeros([2 N]);    % [x, y] x N
+v_person = zeros([2 N]);    % [dx, dy] x N
+a_person = zeros([2 N]);    % [ddx, ddy] x N
+
+% Iteratively calculate spiral trajectory
+for i = 1:N
+    
+    p_person(:,i) = [ a_radius(i)*cos(th_spiral(i)) ;...
+                      b_radius(i)*sin(th_spiral(i)) ];
+    v_person(:,i) = [ dr_a*cos(th_spiral(i)) - a_radius(i)*sin(th_spiral(i))*dth_spiral(i) ;...
+                      dr_b*sin(th_spiral(i)) + b_radius(i)*cos(th_spiral(i))*dth_spiral(i) ];
+    a_person(:,i) = [ dr_a*sin(th_spiral(i))*dth_spiral(i) - dr_a*sin(th_spiral(i))*dth_spiral(i) - a_radius(i)*cos(th_spiral(i))*dth_spiral(i)^2 ;...
+                      dr_b*cos(th_spiral(i))*dth_spiral(i) + dr_b*cos(th_spiral(i))*dth_spiral(i) - b_radius(i)*sin(th_spiral(i))*dth_spiral(i)^2 ];
+
+    % Update angle for next step
+    th_spiral(:, i+1) = th_spiral(i) + dt*dth_spiral(i);
+end
+
+%% Forward simulation
+% From person to hoop
 
 % Init hoop states
 p_hoop = zeros([3 N]);      % [x, y, phi] x N
@@ -61,8 +92,8 @@ for i = 1:N-1
         % Difference in momentum
         F_c = m_hoop*norm(v_plus - v_minus_hoop)*normal;
 
-        % TODO: Implement torque
-        tau_c = 0;
+        % Calculate frictional torque
+        tau_c = norm(F_c)*R_hoop*mu;
 
         % Tau is mu times normal component of F_c
         v_hoop(1:2, i+1) = F_c/m_hoop + v_hoop(1:2, i+1);
@@ -86,6 +117,7 @@ plot(p_person(1,:), p_person(2,:), '-', 'LineWidth', 1, 'Color', [0.65 0.65 0.65
 
 % Prepare plot handles
 h_hoop = plot([0],[0],'b-','LineWidth',2);
+h_hoop_dot = plot([0],[0],'c.','MarkerSize',15);
 h_contact = plot([0],[0],'m-','LineWidth',2);
 h_person = fill([0],[0],'r-','LineStyle','none');
 
@@ -103,26 +135,32 @@ hoop_circle_x = R_hoop*cos(th);
 hoop_circle_y = R_hoop*sin(th);
 
 % For visualization purposes
-sim_speed = 0.1;
+sim_speed = 1;
 
 % Step through and update animation
 for i = 1:N
-    set(h_title,'String',  sprintf('t=%.2f',t(i)) ); % update title
+    % Update time title
+    set(h_title,'String',  sprintf('t=%.2f',t(i)) );
     
+    % Plot bodies
     set(h_person,'XData', person_circle_x + p_person(1,i));
     set(h_person,'YData', person_circle_y + p_person(2,i));
     
     set(h_hoop,'XData', hoop_circle_x + p_hoop(1,i));
     set(h_hoop,'YData', hoop_circle_y + p_hoop(2,i));
 
-    contact_hat = 0.1*F_contact(:,i)/norm(F_contact(:,i));
-    contact_vec_x = [0 contact_hat(1)];
-    contact_vec_y = [0 contact_hat(2)];
-    normal = (p_person(:, i) - p_hoop(1:2, i)) / norm(p_person(:, i) - p_hoop(1:2, i));
+    set(h_hoop_dot,'XData', [p_hoop(1,i) + R_hoop*cos(p_hoop(3,i))]);
+    set(h_hoop_dot,'YData', [p_hoop(2,i) + R_hoop*sin(p_hoop(3,i))]);
+
+    % Plot contact force
+    normal = F_contact(:,i)/norm(F_contact(:,i));
+    contact_vec_x = [0 0.15*normal(1)];
+    contact_vec_y = [0 0.15*normal(2)];
     contact_point = p_hoop(1:2, i) + R_hoop*normal;
     set(h_contact,'XData', contact_vec_x + contact_point(1));
     set(h_contact,'YData', contact_vec_y + contact_point(2));
 
+    % Pause sim between frames
     pause(dt/sim_speed)
 end
 
