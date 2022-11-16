@@ -17,10 +17,10 @@ N = length(t);
 
 % Spiral input
 % NOTE: Keep upper / lower equal for simple ellipse
-a_upper = R_hoop/2; % m       Initial radius on x-axis
-a_lower = R_hoop/10; % m    Final radius on x-axis
-b_upper = R_hoop/2; % m       Initial radius on y-axis
-b_lower = R_hoop/10; % m     Final radius on y-axis
+a_upper = R_hoop/5; % m       Initial radius on x-axis
+a_lower = R_hoop/5; % m    Final radius on x-axis
+b_upper = R_hoop/5; % m       Initial radius on y-axis
+b_lower = R_hoop/5; % m     Final radius on y-axis
 v_spiral = 3; % m/s         Traversal speed
 
 %% Generate spiral trajectory of person
@@ -74,6 +74,8 @@ p_hoop(1:2, 1) = p_person(:,1) + [-R_person + R_hoop; 0];
 p_hoop(3, 1) = pi;
 
 F_contact = zeros([2 N]);
+K_c = 700; % N/m
+D_c = 70; % N*s/m
 
 % Iterate for timesteps
 for i = 1:N-1
@@ -95,15 +97,30 @@ for i = 1:N-1
         % Collision force acts normal to the hoop
         normal = (p_person(:, i) - p_hoop(1:2, i)) / norm(p_person(:, i) - p_hoop(1:2, i));
 
-        % Difference in momentum
-        F_c = m_hoop*norm(v_plus - v_minus_hoop)*normal;
-
-        % Calculate frictional torque
-        tau_c = norm(F_c)*R_hoop*mu;
+        % Spring-damper collision model
+        dx = dist_btwn - R_hoop + R_person;
+        dv = norm(v_plus - v_minus_hoop);
+        F_c = (K_c*dx + D_c*dv)*normal;
 
         % Tau is mu times normal component of F_c
-        v_hoop(1:2, i+1) = F_c/m_hoop + v_hoop(1:2, i+1);
-        v_hoop(3, i+1) = tau_c/I_hoop + v_hoop(3, i+1);
+        tau_c = norm(F_c)*R_hoop*mu;
+        v_hoop(1:2, i+1) = dt*F_c/m_hoop + v_hoop(1:2, i+1);
+        v_hoop(3, i+1) = dt*tau_c/I_hoop + v_hoop(3, i+1);
+
+
+
+
+%         % Difference in momentum
+%         F_c = m_hoop*norm(v_plus - v_minus_hoop)*normal;
+% 
+%         % Calculate frictional torque
+%         tau_c = norm(F_c)*R_hoop*mu;
+% 
+%         % Tau is mu times normal component of F_c
+%         v_hoop(1:2, i+1) = F_c/m_hoop + v_hoop(1:2, i+1);
+%         v_hoop(3, i+1) = tau_c/I_hoop + v_hoop(3, i+1);
+
+
 
         % Save contact force for viewing
         F_contact(:,i) = F_c;
@@ -131,7 +148,7 @@ xlabel('x'); ylabel('y');
 h_title = title('t=0.0s');
 
 axis equal
-axis([-0.75 0.75 -0.75 0.75]);
+axis([-0.65 0.65 -0.65 0.65]);
 
 % Precompute geometries
 th = 0:pi/50:2*pi;
