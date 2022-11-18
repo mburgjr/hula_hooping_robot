@@ -307,12 +307,29 @@ int main (void)
 
 
 
-                // TODO: Interpolate values from unpacked spiral above to get desired points
+
+                // Get desired workspace point from spiral
                 float rDesContact[2] , vDesContact[2];
-                rDesContact[0] = ;
-                rDesContact[1] = ;
-                vDesContact[0] = ;
-                vDesContact[1] = ;
+                for (int i = 0; i<(N-1); i++) {
+                    if (teff == t_spiral[i] | i == N-1) {
+                        // Set exact value
+                        rDesContact[0] = spiral_x[i];
+                        rDesContact[1] = spiral_y[i];
+                        vDesContact[0] = spiral_xdot[i];
+                        vDesContact[1] = spiral_ydot[i];
+                        break;
+                    }
+                    else if (teff >= t_spiral[i] & teff < t_spiral[i+1]) {
+                        // Interpolate
+                        float delta = (teff - t_spiral[i])/(t_spiral[i+1] - t_spiral[i]);
+                        rDesContact[0] = spiral_x[i] + delta*(spiral_x[i+1] - spiral_x[i]);
+                        rDesContact[1] = spiral_y[i] + delta*(spiral_y[i+1] - spiral_y[i]);
+                        vDesContact[0] = spiral_xdot[i] + delta*(spiral_xdot[i+1] - spiral_xdot[i]);
+                        vDesContact[1] = spiral_ydot[i] + delta*(spiral_ydot[i+1] - spiral_ydot[i]);
+                        break;
+                    };
+
+                };
                 
 
 
