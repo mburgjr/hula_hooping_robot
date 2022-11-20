@@ -8,6 +8,7 @@
 #include "HardwareSetup.h"
 #include "Matrix.h"
 #include "MatrixMath.h"
+#include "Servo.h"
 
 #define NUM_INPUTS 17
 #define NUM_OUTPUTS 19
@@ -18,17 +19,17 @@
 Serial pc(USBTX, USBRX);    // USB Serial Terminal
 ExperimentServer server;    // Object that lets us communicate with MATLAB
 Timer t;                    // Timer to measure elapsed time of experiment
+Servo sarrusservo(p21) //adjust PIN!
 
-QEI encoderA(PE_9,PE_11, NC, 1200, QEI::X4_ENCODING);  // MOTOR A ENCODER (no index, 1200 counts/rev, Quadrature encoding)
-QEI encoderB(PA_5, PB_3, NC, 1200, QEI::X4_ENCODING);  // MOTOR B ENCODER (no index, 1200 counts/rev, Quadrature encoding)
-QEI encoderC(PC_6, PC_7, NC, 1200, QEI::X4_ENCODING);  // MOTOR C ENCODER (no index, 1200 counts/rev, Quadrature encoding)
-QEI encoderD(PD_12, PD_13, NC, 1200, QEI::X4_ENCODING);// MOTOR D ENCODER (no index, 1200 counts/rev, Quadrature encoding)
+QEI encoderA(PE_9,PE_11, NC, 1200, QEI::X4_ENCODING);  // MOTOR A ENCODER (no index, 1200 counts/rev, Quadrature encoding) //Shaft motor encoder 
+
+
 
 MotorShield motorShield(24000); //initialize the motor shield with a period of 12000 ticks or ~20kHZ
 Ticker currentLoop;
 
 Matrix MassMatrix(2,2);
-Matrix Jacobian(2,2);
+Matrix Jacobian_(2,2);
 Matrix JacobianT(2,2);
 Matrix InverseMassMatrix(2,2);
 Matrix temp_product(2,2);
@@ -58,10 +59,35 @@ float phi_init;
 
 // TODO: Change these to our values
 
-const float l_OA=.011; 
-const float l_OB=.042; 
-const float l_AC=.096; 
-const float l_DE=.091;
+// Lengths from point to point *
+const float l_OA = 0.04064;
+const float l_AB = 0.1016;
+const float l_BC = l_AB;
+const float l_CD = sqrt((0.032**2) + (0.061**2)); 
+const float l_DE = 0.096; 
+const float l_EHoop=  0.022; // SUBJECT TO CHANGE// HOOP CONTACT POINT!
+const float l_HoopG = 0.122 - l_EF; 
+const float H = 0.4 // NEED TO MEASURE;
+
+//jacobian calculation
+// given x_F, y_F 
+// phi = tan^-1(y_F/x_F) 
+// now lets find h!
+// find alpha (angle between hyp of F and l_FG)
+//hyp = sqrt(x_F^2 +y_F^2);
+// alpha = cos^-1(hyp/l_FG)
+//find angle between leg1 and shaft
+// beta = 90-alpha (degrees) 
+// h1 = l_EG* cos(beta) 
+//find l_shaftE 
+//l_shaftE = sin(beta)*l_EG; 
+// fin h2 
+//h2 = sqrt(l_DE**2-l_shaftE**2)
+// H = h1 +h2 
+
+
+
+
 const float m1 =.0393 + .2;
 const float m2 =.0368; 
 const float m3 = .00783;
@@ -243,35 +269,73 @@ int main (void)
             encoderD.reset();
 
             motorShield.motorAWrite(0, 0); //turn motor A off
-            motorShield.motorBWrite(0, 0); //turn motor B off
-                         
+            // motorShield.motorBWrite(0, 0); //turn motor B off
+            sarrusservo.write(90); //sets servo to midpoint
+            float angle2_prev = 90;
+            timer = millis(); 
+
             // Run experiment
             while( t.read() < start_period + traj_period + end_period) { 
                  
                 // Read encoders to get motor states
                 angle1 = encoderA.getPulses() *PULSE_TO_RAD + angle1_init;       
                 velocity1 = encoderA.getVelocity() * PULSE_TO_RAD;
+
+                //servo current angle 
+                angle2 = sarrusservo.read(); 
+                dt = millis()-timer;
+                timer = millis(); 
+                //servo velocity
+                velocity2 =  (angle2-angle2_prev)/dt; //Servo angular velocity but unsure how to get this 
+                angle2_prev = angle2; 
+
                  
-                angle2 = encoderB.getPulses() * PULSE_TO_RAD + angle2_init;       
-                velocity2 = encoderB.getVelocity() * PULSE_TO_RAD;           
+                // angle2 = encoderB.getPulses() * PULSE_TO_RAD + angle2_init;       
+                // velocity2 = encoderB.getVelocity() * PULSE_TO_RAD;           
                 
-                const float th1 = angle1;
-                const float th2 = angle2;
+                const float th1 = angle1; //phi
+                const float th2 = angle2; //theta
                 const float dth1= velocity1;
                 const float dth2= velocity2;
  
-                // Calculate the Jacobian
-                float Jx_th1 = l_AC*cos(th1 + th2) + l_DE*cos(th1) + l_OB*cos(th1);
-                float Jx_th2 = l_AC*cos(th1 + th2);
-                float Jy_th1 = l_AC*sin(th1 + th2) + l_DE*sin(th1) + l_OB*sin(th1);
-                float Jy_th2 = l_AC*sin(th1 + th2);
-                                
-                // Calculate the forward kinematics (position and velocity)
-                float xFoot = l_AC*sin(th1 + th2) + l_DE*sin(th1) + l_OB*sin(th1);
-                float yFoot = -l_AC*cos(th1 + th2) - l_DE*cos(th1) - l_OB*cos(th1);
-                float dxFoot = dth1*(l_AC*cos(th1 + th2) + l_DE*cos(th1) + l_OB*cos(th1)) + dth2*l_AC*cos(th1 + th2);
-                float dyFoot = dth1*(l_AC*sin(th1 + th2) + l_DE*sin(th1) + l_OB*sin(th1)) + dth2*l_AC*sin(th1 + th2);      
+                // Calculate the Jacobian 1 (from phi, theta to phi, h)
 
+                float h = H - 2*l_AB*cos(th2);
+                float dh = 2*l_AB*sin(th2)*dth2; 
+
+                float Jh_th1 = 0
+                float Jh_th2 = 2*l_AB*sin(th2);
+                float Jphi_th1 = 1
+                float Jphi_th2 = 0
+
+                // Calculate the Jacobian 2 (from phi,h to xHoop, yHoop) 
+
+                //These are really long and crazy - check the jacobian derivation in MATLAB code
+
+                float Jx_h = (l_HoopG*sin(acos((h^2 - l_DE^2 + l_HoopG^2)/(2*h*l_HoopG)) + 90)*cos(phi)*(1/l_HoopG - (h^2 - l_DE^2 + l_HoopG^2)/(2*h^2*l_HoopG)))/(1 - (h^2 - l_DE^2 + l_HoopG^2)^2/(4*h^2*l_HoopG^2))^(1/2);
+                float Jx_phi= -l_HoopG*cos(acos((h^2 - l_DE^2 + l_HoopG^2)/(2*h*l_HoopG)) + 90)*sin(phi);
+                float Jy_h = (l_HoopG*sin(acos((h^2 - l_DE^2 + l_HoopG^2)/(2*h*l_HoopG)) + 90)*sin(phi)*(1/l_HoopG - (h^2 - l_DE^2 + l_HoopG^2)/(2*h^2*l_HoopG)))/(1 - (h^2 - l_DE^2 + l_HoopG^2)^2/(4*h^2*l_HoopG^2))^(1/2);
+                float Jy_phi = l_HoopG*cos(acos((h^2 - l_DE^2 + l_HoopG^2)/(2*h*l_HoopG)) + 90)*cos(phi);
+ 
+                                
+                //Calculate the total Jacobian (J2*J1)
+J 
+                float Jx_th1 = Jh_th1*Jx_h + Jphi_th1*Jx_phi;
+                float Jx_th2 = Jh_th2*Jx_h + Jphi_th2*Jx_phi;
+                float Jy_th1 = Jh_th1*Jy_h + Jphi_th1*Jy_phi;
+                float Jy_th2 = Jh_th2*Jy_h + Jphi_th2*Jy_phi;
+                // Calculate the forward kinematics (position and velocity) // calculate xF and yF
+                float xHoop = l_HoopG*cos(acos((h^2 - l_DE^2 + l_HoopG^2)/(2*h*l_HoopG)) + 90)*cos(th1);
+                float yHoop = l_HoopG*cos(acos((h^2 - l_DE^2 + l_HoopG^2)/(2*h*l_HoopG)) + 90)*sin(th1);
+
+                //These are really long and crazy - check the jacobian derivation in MATLAB code
+
+                float dxHoop = (dh*l_HoopG*sin(acos((h^2 - l_DE^2 + l_HoopG^2)/(2*h*l_HoopG)) + 90)*cos(th1)*(1/l_HoopG - (h^2 - l_DE^2 + l_HoopG^2)/(2*h^2*l_HoopG)))/(1 - (h^2 - l_DE^2 + l_HoopG^2)^2/(4*h^2*l_HoopG^2))^(1/2) - dth1*l_HoopG*cos(acos((h^2 - l_DE^2 + l_HoopG^2)/(2*h*l_HoopG)) + 90)*sin(phi);
+                float dyHoop = dth1*l_HoopG*cos(acos((h^2 - l_DE^2 + l_HoopG^2)/(2*h*l_HoopG)) + 90)*cos(th1) + (dh*l_HoopG*sin(acos((h^2 - l_DE^2 + l_HoopG^2)/(2*h*l_HoopG)) + 90)*sin(th1)*(1/l_HoopG - (h^2 - l_DE^2 + l_HoopG^2)/(2*h^2*l_HoopG)))/(1 - (h^2 - l_DE^2 + l_HoopG^2)^2/(4*h^2*l_HoopG^2))^(1/2);
+ 
+   
+
+                // TO ADJUST 
                 // Set gains based on buffer and traj times, then calculate desired x,y from Bezier trajectory at current time if necessary
                 float teff  = 0;
                 float vMult = 0;
@@ -306,7 +370,7 @@ int main (void)
 
 
 
-
+                //ADJUSTED
 
                 // Get desired workspace point from spiral
                 float rDesContact[2] , vDesContact[2];
@@ -334,30 +398,37 @@ int main (void)
 
 
 
-
+                //ADJUSTED
                 // Calculate the inverse kinematics (joint positions and velocities) for desired joint angles              
-                float xFoot_inv = -rDesFoot[0];
-                float yFoot_inv = rDesFoot[1];                
-                float l_OE = sqrt( (pow(xFoot_inv,2) + pow(yFoot_inv,2)) );
-                float alpha = abs(acos( (pow(l_OE,2) - pow(l_AC,2) - pow((l_OB+l_DE),2))/(-2.0f*l_AC*(l_OB+l_DE)) ));
-                float th2_des = -(3.14159f - alpha); 
-                float th1_des = -((3.14159f/2.0f) + atan2(yFoot_inv,xFoot_inv) - abs(asin( (l_AC/l_OE)*sin(alpha) )));
+                float xHoop_inv = -rDesContact[0];
+                float yHoop_inv = rDesContact[1];                
+                float r = sqrt( (pow(xFoot_inv,2) + pow(yFoot_inv,2)) );
+                float gamma = abs(acos(r/l_HoopG)); 
+                float alpha = 3.14159f-gamma; 
+                float h_des1 = cos(alpha)*(l_EHoop + l_HoopG); 
+                float straight_edge = sin(alpha)*(l_EHoop + l_HoopG); 
+                float h_des2 = sqrt(pow(straight_edge,2) + pow(l_DE,2); 
+                float h_des = h_des1 + h_des2; 
+                float th2_des = acos((H-h_des)/(2*l_AB)); 
+                float th1_des = -((3.14159f/2.0f) + atan2(yHoop_inv,xHoop_inv); 
                 
                 float dd = (Jx_th1*Jy_th2 - Jx_th2*Jy_th1);
                 float dth1_des = (1.0f/dd) * (  Jy_th2*vDesFoot[0] - Jx_th2*vDesFoot[1] );
                 float dth2_des = (1.0f/dd) * ( -Jy_th1*vDesFoot[0] + Jx_th1*vDesFoot[1] );
         
                 // Calculate error variables
-                float e_x = rDesFoot[0] - xFoot;
-                float e_y = rDesFoot[1] - yFoot;
-                float de_x = vDesFoot[0] - dxFoot;
-                float de_y = vDesFoot[1] - dyFoot;
+                float e_x = rDesContact[0] - xHoop;
+                float e_y = rDesContact[1] - yHoop
+                float de_x = vDesContact[0] - dxHoop;
+                float de_y = vDesContact[1] - dyHoop;
         
                 // Calculate virtual force on foot
+                //DONT THINK THIS NEEDS TO CHANGE
                 float fx = K_xx*e_x + K_xy*e_y + D_xx*de_x + D_xy*de_y;
                 float fy = K_xy*e_x + K_yy*e_y + D_xy*de_x + D_yy*de_y;
                 
                 // Calculate mass matrix elements
+                //UNSURE
                 float M11 = I1 + I2 + I3 + I4 + Ir + Ir*pow(N,2) + pow(l_AC,2)*m4 + pow(l_A_m3,2)*m3 + pow(l_B_m2,2)*m2 + pow(l_C_m4,2)*m4 + pow(l_OA,2)*m3 + pow(l_OB,2)*m2 + pow(l_OA,2)*m4 + pow(l_O_m1,2)*m1 + 2*l_C_m4*l_OA*m4 + 2*l_AC*l_C_m4*m4*cos(th2) + 2*l_AC*l_OA*m4*cos(th2) + 2*l_A_m3*l_OA*m3*cos(th2) + 2*l_B_m2*l_OB*m2*cos(th2); 
                 float M12 = I2 + I3 + pow(l_AC,2)*m4 + pow(l_A_m3,2)*m3 + pow(l_B_m2,2)*m2 + Ir*N + l_AC*l_C_m4*m4*cos(th2) + l_AC*l_OA*m4*cos(th2) + l_A_m3*l_OA*m3*cos(th2) + l_B_m2*l_OB*m2*cos(th2); 
                 float M22 = Ir*pow(N,2) + m4*pow(l_AC,2) + m3*pow(l_A_m3,2) + m2*pow(l_B_m2,2) + I2 + I3;
@@ -397,7 +468,7 @@ int main (void)
 
 
 
-
+                //ADJUSTED 
 
                 // Form output to send to MATLAB     
                 float output_data[NUM_OUTPUTS];
