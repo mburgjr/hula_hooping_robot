@@ -12,6 +12,7 @@
 
 #define NUM_INPUTS 17
 #define NUM_OUTPUTS 19
+#define PI 3.14159265359
 
 #define PULSE_TO_RAD (2.0f*3.14159f / 1200.0f)
 
@@ -286,7 +287,7 @@ int main (void)
                 dt = millis()-timer;
                 timer = millis(); 
                 //servo velocity
-                velocity2 =  (angle2-angle2_prev)/dt; //Servo angular velocity but unsure how to get this 
+                velocity2 = (angle2-angle2_prev)/dt; //Servo angular velocity but unsure how to get this 
                 angle2_prev = angle2; 
 
                  
@@ -301,21 +302,23 @@ int main (void)
                 // Calculate the Jacobian 1 (from phi, theta to phi, h)
 
                 float h = H - 2*l_AB*cos(th2);
-                float dh = 2*l_AB*sin(th2)*dth2; 
+                float dh = 2*l_AB*sin(th2)*dth2;
+                float phi = th1;
+                float dphi = dth1;
 
-                float Jh_th1 = 0
+                float Jh_th1 = 0;
                 float Jh_th2 = 2*l_AB*sin(th2);
-                float Jphi_th1 = 1
-                float Jphi_th2 = 0
+                float Jphi_th1 = 1;
+                float Jphi_th2 = 0;
 
                 // Calculate the Jacobian 2 (from phi,h to xHoop, yHoop) 
 
                 //These are really long and crazy - check the jacobian derivation in MATLAB code
 
-                float Jx_h = (l_HoopG*sin(acos((h^2 - l_DE^2 + l_HoopG^2)/(2*h*l_HoopG)) + 90)*cos(phi)*(1/l_HoopG - (h^2 - l_DE^2 + l_HoopG^2)/(2*h^2*l_HoopG)))/(1 - (h^2 - l_DE^2 + l_HoopG^2)^2/(4*h^2*l_HoopG^2))^(1/2);
-                float Jx_phi= -l_HoopG*cos(acos((h^2 - l_DE^2 + l_HoopG^2)/(2*h*l_HoopG)) + 90)*sin(phi);
-                float Jy_h = (l_HoopG*sin(acos((h^2 - l_DE^2 + l_HoopG^2)/(2*h*l_HoopG)) + 90)*sin(phi)*(1/l_HoopG - (h^2 - l_DE^2 + l_HoopG^2)/(2*h^2*l_HoopG)))/(1 - (h^2 - l_DE^2 + l_HoopG^2)^2/(4*h^2*l_HoopG^2))^(1/2);
-                float Jy_phi = l_HoopG*cos(acos((h^2 - l_DE^2 + l_HoopG^2)/(2*h*l_HoopG)) + 90)*cos(phi);
+                float Jx_h = (l_HoopG*sin(acos((h^2 - l_DE^2 + l_HoopG^2)/(2*h*l_HoopG)) + PI/2)*cos(phi)*(1/l_HoopG - (h^2 - l_DE^2 + l_HoopG^2)/(2*h^2*l_HoopG)))/(1 - (h^2 - l_DE^2 + l_HoopG^2)^2/(4*h^2*l_HoopG^2))^(1/2);
+                float Jx_phi= -l_HoopG*cos(acos((h^2 - l_DE^2 + l_HoopG^2)/(2*h*l_HoopG)) + PI/2)*sin(phi);
+                float Jy_h = (l_HoopG*sin(acos((h^2 - l_DE^2 + l_HoopG^2)/(2*h*l_HoopG)) + PI/2)*sin(phi)*(1/l_HoopG - (h^2 - l_DE^2 + l_HoopG^2)/(2*h^2*l_HoopG)))/(1 - (h^2 - l_DE^2 + l_HoopG^2)^2/(4*h^2*l_HoopG^2))^(1/2);
+                float Jy_phi = l_HoopG*cos(acos((h^2 - l_DE^2 + l_HoopG^2)/(2*h*l_HoopG)) + PI/2)*cos(phi);
  
                                 
                 //Calculate the total Jacobian (J2*J1)
@@ -325,13 +328,13 @@ J
                 float Jy_th1 = Jh_th1*Jy_h + Jphi_th1*Jy_phi;
                 float Jy_th2 = Jh_th2*Jy_h + Jphi_th2*Jy_phi;
                 // Calculate the forward kinematics (position and velocity) // calculate xF and yF
-                float xHoop = l_HoopG*cos(acos((h^2 - l_DE^2 + l_HoopG^2)/(2*h*l_HoopG)) + 90)*cos(th1);
-                float yHoop = l_HoopG*cos(acos((h^2 - l_DE^2 + l_HoopG^2)/(2*h*l_HoopG)) + 90)*sin(th1);
+                float xHoop = l_HoopG*cos(acos((h^2 - l_DE^2 + l_HoopG^2)/(2*h*l_HoopG)) + PI/2)*cos(th1);
+                float yHoop = l_HoopG*cos(acos((h^2 - l_DE^2 + l_HoopG^2)/(2*h*l_HoopG)) + PI/2)*sin(th1);
 
                 //These are really long and crazy - check the jacobian derivation in MATLAB code
 
-                float dxHoop = (dh*l_HoopG*sin(acos((h^2 - l_DE^2 + l_HoopG^2)/(2*h*l_HoopG)) + 90)*cos(th1)*(1/l_HoopG - (h^2 - l_DE^2 + l_HoopG^2)/(2*h^2*l_HoopG)))/(1 - (h^2 - l_DE^2 + l_HoopG^2)^2/(4*h^2*l_HoopG^2))^(1/2) - dth1*l_HoopG*cos(acos((h^2 - l_DE^2 + l_HoopG^2)/(2*h*l_HoopG)) + 90)*sin(phi);
-                float dyHoop = dth1*l_HoopG*cos(acos((h^2 - l_DE^2 + l_HoopG^2)/(2*h*l_HoopG)) + 90)*cos(th1) + (dh*l_HoopG*sin(acos((h^2 - l_DE^2 + l_HoopG^2)/(2*h*l_HoopG)) + 90)*sin(th1)*(1/l_HoopG - (h^2 - l_DE^2 + l_HoopG^2)/(2*h^2*l_HoopG)))/(1 - (h^2 - l_DE^2 + l_HoopG^2)^2/(4*h^2*l_HoopG^2))^(1/2);
+                float dxHoop = (dh*l_HoopG*sin(acos((h^2 - l_DE^2 + l_HoopG^2)/(2*h*l_HoopG)) + PI/2)*cos(th1)*(1/l_HoopG - (h^2 - l_DE^2 + l_HoopG^2)/(2*h^2*l_HoopG)))/(1 - (h^2 - l_DE^2 + l_HoopG^2)^2/(4*h^2*l_HoopG^2))^(1/2) - dth1*l_HoopG*cos(acos((h^2 - l_DE^2 + l_HoopG^2)/(2*h*l_HoopG)) + PI/2)*sin(phi);
+                float dyHoop = dth1*l_HoopG*cos(acos((h^2 - l_DE^2 + l_HoopG^2)/(2*h*l_HoopG)) + PI/2)*cos(th1) + (dh*l_HoopG*sin(acos((h^2 - l_DE^2 + l_HoopG^2)/(2*h*l_HoopG)) + PI/2)*sin(th1)*(1/l_HoopG - (h^2 - l_DE^2 + l_HoopG^2)/(2*h^2*l_HoopG)))/(1 - (h^2 - l_DE^2 + l_HoopG^2)^2/(4*h^2*l_HoopG^2))^(1/2);
  
    
 
@@ -367,11 +370,6 @@ J
                     vMult = 0;
                 }
                 
-
-
-
-                //ADJUSTED
-
                 // Get desired workspace point from spiral
                 float rDesContact[2] , vDesContact[2];
                 for (int i = 0; i<(N-1); i++) {
@@ -398,19 +396,19 @@ J
 
 
 
-                //ADJUSTED
+                // ADJUSTED
                 // Calculate the inverse kinematics (joint positions and velocities) for desired joint angles              
                 float xHoop_inv = -rDesContact[0];
                 float yHoop_inv = rDesContact[1];                
-                float r = sqrt( (pow(xFoot_inv,2) + pow(yFoot_inv,2)) );
+                float r = sqrt( pow(xFoot_inv,2) + pow(yFoot_inv,2) );
                 float gamma = abs(acos(r/l_HoopG)); 
                 float alpha = 3.14159f-gamma; 
                 float h_des1 = cos(alpha)*(l_EHoop + l_HoopG); 
                 float straight_edge = sin(alpha)*(l_EHoop + l_HoopG); 
-                float h_des2 = sqrt(pow(straight_edge,2) + pow(l_DE,2); 
+                float h_des2 = sqrt(pow(straight_edge,2) + pow(l_DE,2)); 
                 float h_des = h_des1 + h_des2; 
                 float th2_des = acos((H-h_des)/(2*l_AB)); 
-                float th1_des = -((3.14159f/2.0f) + atan2(yHoop_inv,xHoop_inv); 
+                float th1_des = -(3.14159f/2.0f) + atan2(yHoop_inv,xHoop_inv); 
                 
                 float dd = (Jx_th1*Jy_th2 - Jx_th2*Jy_th1);
                 float dth1_des = (1.0f/dd) * (  Jy_th2*vDesFoot[0] - Jx_th2*vDesFoot[1] );
@@ -423,12 +421,12 @@ J
                 float de_y = vDesContact[1] - dyHoop;
         
                 // Calculate virtual force on foot
-                //DONT THINK THIS NEEDS TO CHANGE
+                // DONT THINK THIS NEEDS TO CHANGE
                 float fx = K_xx*e_x + K_xy*e_y + D_xx*de_x + D_xy*de_y;
                 float fy = K_xy*e_x + K_yy*e_y + D_xy*de_x + D_yy*de_y;
                 
                 // Calculate mass matrix elements
-                //UNSURE
+                // UNSURE
                 float M11 = I1 + I2 + I3 + I4 + Ir + Ir*pow(N,2) + pow(l_AC,2)*m4 + pow(l_A_m3,2)*m3 + pow(l_B_m2,2)*m2 + pow(l_C_m4,2)*m4 + pow(l_OA,2)*m3 + pow(l_OB,2)*m2 + pow(l_OA,2)*m4 + pow(l_O_m1,2)*m1 + 2*l_C_m4*l_OA*m4 + 2*l_AC*l_C_m4*m4*cos(th2) + 2*l_AC*l_OA*m4*cos(th2) + 2*l_A_m3*l_OA*m3*cos(th2) + 2*l_B_m2*l_OB*m2*cos(th2); 
                 float M12 = I2 + I3 + pow(l_AC,2)*m4 + pow(l_A_m3,2)*m3 + pow(l_B_m2,2)*m2 + Ir*N + l_AC*l_C_m4*m4*cos(th2) + l_AC*l_OA*m4*cos(th2) + l_A_m3*l_OA*m3*cos(th2) + l_B_m2*l_OB*m2*cos(th2); 
                 float M22 = Ir*pow(N,2) + m4*pow(l_AC,2) + m3*pow(l_A_m3,2) + m2*pow(l_B_m2,2) + I2 + I3;
