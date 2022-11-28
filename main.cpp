@@ -248,10 +248,6 @@ int main (void)
 
 
 
-
-
-
-
             // NOTE: I changed angle1 => h and angle2 => phi
             
             
@@ -279,15 +275,15 @@ int main (void)
             while( t.read() < start_period + traj_period + end_period) { 
                  
                 // Read encoders to get motor states
-                angle1 = encoderA.getPulses() *PULSE_TO_RAD + angle1_init;       
-                velocity1 = encoderA.getVelocity() * PULSE_TO_RAD;
+                float angle1 = encoderA.getPulses() *PULSE_TO_RAD + angle1_init;       
+                float velocity1 = encoderA.getVelocity() * PULSE_TO_RAD;
 
                 //servo current angle 
-                angle2 = sarrusservo.read(); 
+                float angle2 = sarrusservo.read(); 
                 dt = millis()-timer;
                 timer = millis(); 
                 //servo velocity
-                velocity2 = (angle2-angle2_prev)/dt; //Servo angular velocity but unsure how to get this 
+                float velocity2 = (angle2-angle2_prev)/dt; //Servo angular velocity but unsure how to get this 
                 angle2_prev = angle2; 
 
                  
@@ -421,52 +417,11 @@ J
                 float de_y = vDesContact[1] - dyHoop;
         
                 // Calculate virtual force on foot
-                // DONT THINK THIS NEEDS TO CHANGE
                 float fx = K_xx*e_x + K_xy*e_y + D_xx*de_x + D_xy*de_y;
                 float fy = K_xy*e_x + K_yy*e_y + D_xy*de_x + D_yy*de_y;
                 
-                // Calculate mass matrix elements
-                // UNSURE
-                float M11 = I1 + I2 + I3 + I4 + Ir + Ir*pow(N,2) + pow(l_AC,2)*m4 + pow(l_A_m3,2)*m3 + pow(l_B_m2,2)*m2 + pow(l_C_m4,2)*m4 + pow(l_OA,2)*m3 + pow(l_OB,2)*m2 + pow(l_OA,2)*m4 + pow(l_O_m1,2)*m1 + 2*l_C_m4*l_OA*m4 + 2*l_AC*l_C_m4*m4*cos(th2) + 2*l_AC*l_OA*m4*cos(th2) + 2*l_A_m3*l_OA*m3*cos(th2) + 2*l_B_m2*l_OB*m2*cos(th2); 
-                float M12 = I2 + I3 + pow(l_AC,2)*m4 + pow(l_A_m3,2)*m3 + pow(l_B_m2,2)*m2 + Ir*N + l_AC*l_C_m4*m4*cos(th2) + l_AC*l_OA*m4*cos(th2) + l_A_m3*l_OA*m3*cos(th2) + l_B_m2*l_OB*m2*cos(th2); 
-                float M22 = Ir*pow(N,2) + m4*pow(l_AC,2) + m3*pow(l_A_m3,2) + m2*pow(l_B_m2,2) + I2 + I3;
-                
-                
-                // Populate mass matrix
-                MassMatrix.Clear();
-                MassMatrix << M11 << M12
-                           << M12 << M22;
-                
-                // Populate Jacobian matrix
-                Jacobian.Clear();
-                Jacobian << Jx_th1 << Jx_th2
-                         << Jy_th1 << Jy_th2;
-                
-                // Once you have copied the elements of the mass matrix, uncomment the following section
-                
-                // Calculate Lambda matrix
-                JacobianT = MatrixMath::Transpose(Jacobian);
-                InverseMassMatrix = MatrixMath::Inv(MassMatrix);
-                temp_product = Jacobian*InverseMassMatrix*JacobianT;
-                Lambda = MatrixMath::Inv(temp_product); 
-                
-                // Pull elements of Lambda matrix
-                float L11 = Lambda.getNumber(1,1);
-                float L12 = Lambda.getNumber(1,2);
-                float L21 = Lambda.getNumber(2,1);
-                float L22 = Lambda.getNumber(2,2);               
-                                
-                                
-                                
-                // Set desired currents
-                current_des1 = (fx*(Jx_th1*L11 + Jy_th1*L21) + fy*(Jx_th1*L12 + Jy_th1*L22))/k_t;          
-                current_des2 = (fx*(Jx_th2*L11 + Jy_th2*L21) + fy*(Jx_th2*L12 + Jy_th2*L22))/k_t;   
-
-
-
-
-
-                //ADJUSTED 
+                current_des1 = (Jx_th1*f_x + Jy_th1*f_y)/k_t;
+                current_des2 = (Jy_th2*f_y + Jx_th2*f_x)/k_t; 
 
                 // Form output to send to MATLAB     
                 float output_data[NUM_OUTPUTS];
