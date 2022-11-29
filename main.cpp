@@ -37,6 +37,7 @@ Matrix temp_product(2,2);
 Matrix Lambda(2,2);
 
 // Variables for q1 (h)
+float angle1;
 float current1;
 float current_des1 = 0;
 float prev_current_des1 = 0;
@@ -52,6 +53,8 @@ float angle1_init = 0;
 unsigned long timer1;
 
 // Variables for q2 (phi)
+float angle2;
+float velocity2;
 float current2;
 float current_des2 = 0;
 float prev_current_des2 = 0;
@@ -273,15 +276,15 @@ int main (void)
             while( t.read() < start_period + traj_period + end_period) { 
                  
                 // Read encoders to get motor states
-                float angle1 = encoderA.getPulses() *PULSE_TO_RAD + angle1_init;       
-                float velocity1 = encoderA.getVelocity() * PULSE_TO_RAD;
+                angle1 = encoderA.getPulses() *PULSE_TO_RAD + angle1_init;       
+                velocity1 = encoderA.getVelocity() * PULSE_TO_RAD;
 
                 //servo current angle 
-                float angle2 = sarrusservo.read(); 
+                angle2 = sarrusservo.read(); 
                 dt = t.read() - timer1;
                 timer1 = t.read(); 
                 //servo velocity
-                float velocity2 = (angle2-angle2_prev)/dt; //Servo angular velocity but unsure how to get this 
+                velocity2 = (angle2-angle2_prev)/dt; //Servo angular velocity but unsure how to get this 
                 angle2_prev = angle2; 
 
                  
@@ -301,8 +304,6 @@ int main (void)
                 float dphi = dth1;
 
 
-
-
                 // TODO: Are these correct ?????
                 float Jh_th1 = 0;
                 float Jh_th2 = 2*l_AB*sin(th2);
@@ -314,18 +315,23 @@ int main (void)
 
                 // Calculate the Jacobian 2 (from phi,h to xHoop, yHoop) 
 
-                //These are really long and crazy - check the jacobian derivation in MATLAB code
+                // These are really long and crazy - check the jacobian derivation in MATLAB code
 
                 float l_EG = l_EHoop + l_HoopG;
-                float coeff1 = 2*h*h*sqrt(-pow(h,4) + 2*h*h*l_DE*l_DE + 2*h*h*l_EG*l_EG - pow(l_DE,4) + 2*l_DE*l_DE*l_EG*l_EG - pow(l_EG,4));
-                float coeff2 = sqrt((h + l_DE + l_EG)*(h + l_DE - l_EG)*(h - l_DE + l_EG)*(-h + l_DE + l_EG));
-                float coeff3 = pow(h,4) - pow(l_DE,4) + 2*l_DE*l_DE*l_EG*l_EG - pow(l_EG,4);
+                float coeff1 = 2.0*h*h*sqrt(abs(-pow(h,4) + 2.0*h*h*l_DE*l_DE + 2.0*h*h*l_EG*l_EG - pow(l_DE,4) + 2.0*l_DE*l_DE*l_EG*l_EG - pow(l_EG,4)));
+                float coeff2 = sqrt(abs((h + l_DE + l_EG)*(h + l_DE - l_EG)*(h - l_DE + l_EG)*(-h + l_DE + l_EG)));
+                float coeff3 = pow(h,4) - pow(l_DE,4) + 2.0*l_DE*l_DE*l_EG*l_EG - pow(l_EG,4);
+                
+                pc.printf("%f", coeff1);
+                pc.printf("%f", coeff2);
+                pc.printf("%f", coeff3);
+                
                 float Jx_h = -cos(phi)*coeff3/coeff1;
                 float Jx_phi = -sin(phi)*coeff3/coeff1;
                 float Jy_h = -sin(phi)*coeff2/(2*h);
                 float Jy_phi = cos(phi)*coeff2/(2*h);
 
-                //Calculate the total Jacobian (J2*J1)
+                // Calculate the total Jacobian (J2*J1)
 
                 float Jx_th1 = Jh_th1*Jx_h + Jphi_th1*Jx_phi;
                 float Jx_th2 = Jh_th2*Jx_h + Jphi_th2*Jx_phi;
@@ -334,6 +340,13 @@ int main (void)
                 // Calculate the forward kinematics (position and velocity) // calculate xF and yF
                 float xHoop = cos(phi)*coeff2/(2*h);
                 float yHoop = sin(phi)*coeff2/(2*h);
+                
+//                pc.printf("%f", Jx_th1);
+//                pc.printf("%f", Jx_th2);
+//                pc.printf("%f", Jy_th1);
+//                pc.printf("%f", Jy_th2);
+//                pc.printf("%f", xHoop);
+//                pc.printf("%f", yHoop);
 
                 //These are really long and crazy - check the jacobian derivation in MATLAB code
 
@@ -416,8 +429,6 @@ int main (void)
                 float th1_des = -(3.14159f/2.0f) + atan2(yHoop_inv,xHoop_inv); 
                 
                 float dd = (Jx_th1*Jy_th2 - Jx_th2*Jy_th1);
-                //float dth1_des = (1.0f/dd) * (  Jy_th2*vDesHoop[0] - Jx_th2*vDesHoop[1] );
-                //float dth2_des = (1.0f/dd) * ( -Jy_th1*vDesHoop[0] + Jx_th1*vDesHoop[1] );
         
                 // Calculate error variables
                 float e_x = rDesContact[0] - xHoop;
@@ -431,26 +442,23 @@ int main (void)
                 
                 current_des1 = (Jx_th1*fx + Jy_th1*fy)/k_t;
                 current_des2 = (Jy_th2*fy + Jx_th2*fx)/k_t; 
-                
-                pc.printf("%f", current_des1);
-                pc.printf("%f", current_des2);
 
                 // Form output to send to MATLAB     
                 float output_data[NUM_OUTPUTS];
                 // current time
                 output_data[0] = t.read();
                 // motor 1 state
-                output_data[1] = h;
-                output_data[2] = h_velocity;  
+                output_data[1] = angle1;
+                output_data[2] = velocity1;  
                 output_data[3] = current1;
                 output_data[4] = current_des1;
-                output_data[5] = h_duty_cycle;
+                output_data[5] = phi_duty_cycle;
                 // motor 2 state
-                output_data[6] = phi;
-                output_data[7] = phi_velocity;
+                output_data[6] = angle2;
+                output_data[7] = velocity2;
                 output_data[8] = current2;
                 output_data[9] = current_des2;
-                output_data[10]= phi_duty_cycle;
+                output_data[10]= h_duty_cycle;
                 // foot state
                 output_data[11] = xHoop;
                 output_data[12] = yHoop;

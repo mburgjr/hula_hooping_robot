@@ -5,12 +5,12 @@ function output_data = Experiment_trajectory( a_spiral, b_spiral, v_spiral, h_in
     a1 = subplot(421);
     h1 = plot([0],[0]);
     h1.XData = []; h1.YData = [];
-    ylabel('h (m)');
+    ylabel('Phi (rad)');
     
     a2 = subplot(423);
     h2 = plot([0],[0]);
     h2.XData = []; h2.YData = [];
-    ylabel('h Velocity (m/s)');
+    ylabel('Phi dot (rad/s)');
     
     a3 = subplot(425);
     h3 = plot([0],[0]);
@@ -30,12 +30,12 @@ function output_data = Experiment_trajectory( a_spiral, b_spiral, v_spiral, h_in
     a5 = subplot(422);
     h21 = plot([0],[0]);
     h21.XData = []; h21.YData = [];
-    ylabel('phi (rad)');
+    ylabel('Theta (rad)');
     
     a6 = subplot(424);
     h22 = plot([0],[0]);
     h22.XData = []; h22.YData = [];
-    ylabel('phi Velocity (rad/s)');
+    ylabel('Theta Dot (rad/s)');
     
     a7 = subplot(426);
     h23 = plot([0],[0]);
