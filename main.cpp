@@ -9,6 +9,7 @@
 #include "Matrix.h"
 #include "MatrixMath.h"
 #include "Servo.h"
+#include "millis.h"
 
 #define NUM_INPUTS 17
 #define NUM_OUTPUTS 19
@@ -20,7 +21,7 @@
 Serial pc(USBTX, USBRX);    // USB Serial Terminal
 ExperimentServer server;    // Object that lets us communicate with MATLAB
 Timer t;                    // Timer to measure elapsed time of experiment
-Servo sarrusservo(p21) //adjust PIN!
+Servo sarrusservo(PB_3); //adjust PIN!
 
 QEI encoderA(PE_9,PE_11, NC, 1200, QEI::X4_ENCODING);  // MOTOR A ENCODER (no index, 1200 counts/rev, Quadrature encoding) //Shaft motor encoder 
 
@@ -42,9 +43,14 @@ float current_des1 = 0;
 float prev_current_des1 = 0;
 float current_int1 = 0;
 float h;
+float velocity1;
+float duty_cycle1;
 float h_velocity;
 float h_duty_cycle;
 float h_init;
+float angle1_init = 0; 
+
+unsigned long timer;
 
 // Variables for q2 (phi)
 float current2;
@@ -64,11 +70,11 @@ float phi_init;
 const float l_OA = 0.04064;
 const float l_AB = 0.1016;
 const float l_BC = l_AB;
-const float l_CD = sqrt((0.032**2) + (0.061**2)); 
+const float l_CD = sqrt(pow(0.032,2) + pow(0.061,2)); 
 const float l_DE = 0.096; 
 const float l_EHoop=  0.022; // SUBJECT TO CHANGE// HOOP CONTACT POINT!
-const float l_HoopG = 0.122 - l_EF; 
-const float H = 0.4 // NEED TO MEASURE;
+const float l_HoopG = 0.122 - l_EHoop; 
+const float H = 0.4; // NEED TO MEASURE;
 
 //jacobian calculation
 // given x_F, y_F 
@@ -107,7 +113,9 @@ const float Ir = 0.0035/pow(N,2);
 // Timing parameters
 float current_control_period_us = 200.0f;     // 5kHz current control loop
 float impedance_control_period_us = 1000.0f;  // 1kHz impedance control loop
-float start_period, traj_time, end_period;
+float start_period, traj_time, end_period, a_upper, a_lower, b_upper, b_lower, v_spiral, traj_period;
+
+
 
 // Control parameters
 float current_Kp = 4.0f;         
@@ -155,25 +163,25 @@ void CurrentLoop()
     }             
     prev_current_des1 = current_des1; 
     
-    current2     = -(((float(motorShield.readCurrentB())/65536.0f)*30.0f)-15.0f);       // measure current
-    velocity2 = encoderB.getVelocity() * PULSE_TO_RAD;                                  // measure velocity  
-    float err_c2 = current_des2 - current2;                                             // current error
-    current_int2 += err_c2;                                                             // integrate error
-    current_int2 = fmaxf( fminf(current_int2, current_int_max), -current_int_max);      // anti-windup   
-    float ff2 = R*current_des2 + k_t*velocity2;                                         // feedforward terms
-    duty_cycle2 = (ff2 + current_Kp*err_c2 + current_Ki*current_int2)/supply_voltage;   // PI current controller
+    //current2     = -(((float(motorShield.readCurrentB())/65536.0f)*30.0f)-15.0f);       // measure current
+//velocity2 = encoderB.getVelocity() * PULSE_TO_RAD;                                  // measure velocity  
+    //float err_c2 = current_des2 - current2;                                             // current error
+    //current_int2 += err_c2;                                                             // integrate error
+    //current_int2 = fmaxf( fminf(current_int2, current_int_max), -current_int_max);      // anti-windup   
+    //float ff2 = R*current_des2 + k_t*velocity2;                                         // feedforward terms
+    //duty_cycle2 = (ff2 + current_Kp*err_c2 + current_Ki*current_int2)/supply_voltage;   // PI current controller
     
-    float absDuty2 = abs(duty_cycle2);
-    if (absDuty2 > duty_max) {
-        duty_cycle2 *= duty_max / absDuty2;
-        absDuty2 = duty_max;
-    }    
-    if (duty_cycle2 < 0) { // backwards
-        motorShield.motorBWrite(absDuty2, 1);
-    } else { // forwards
-        motorShield.motorBWrite(absDuty2, 0);
-    }             
-    prev_current_des2 = current_des2; 
+    //float absDuty2 = abs(duty_cycle2);
+//    if (absDuty2 > duty_max) {
+//        duty_cycle2 *= duty_max / absDuty2;
+//        absDuty2 = duty_max;
+//    }    
+//    if (duty_cycle2 < 0) { // backwards
+//        motorShield.motorBWrite(absDuty2, 1);
+//    } else { // forwards
+//        motorShield.motorBWrite(absDuty2, 0);
+//    }             
+//    prev_current_des2 = current_des2; 
     
 }
 
@@ -181,7 +189,7 @@ int main (void)
 {
     
     // Object for 7th order Cartesian foot trajectory
-    BezierCurve rDesFoot_bez(2,BEZIER_ORDER_FOOT);
+    //BezierCurve rDesFoot_bez(2,BEZIER_ORDER_FOOT);
     
     // Link the terminal with our server and start it up
     server.attachTerminal(pc);
@@ -224,25 +232,29 @@ int main (void)
             float dr_b = (b_lower - b_upper) / traj_time;
 
             // Create trajectory to interpolate from
-            float N = 500;
+            int N = 500;
             float dt = traj_time / N;
-            float spiral_t[N], spiral_x[N], spiral_y[N], spiral_xdot[N], spiral_ydot[N];
+            float spiral_t[N];
+            float spiral_x[N];
+            float spiral_y[N];
+            float spiral_xdot[N];
+            float spiral_ydot[N];
 
             float th = 0;
             for(int i = 0; i<N; i++) {
                 float t = i*dt;
                 float radius_a = a_upper + dr_a*t;
                 float radius_b = b_upper + dr_a*t;
-                float r_spiral = (radius_a^2 + radius_b^2)^0.5;
+                float r_spiral = sqrt(pow(radius_a,2) + pow(radius_b,2));
 
-                float dth_spiral = v_spiral*(r_spiral^-1);
+                float dth_spiral = v_spiral* pow(r_spiral,-1);
                 th += dth_spiral*dt;
             
                 spiral_t[i] = t;
                 spiral_x[i] = radius_a*cos(th);
                 spiral_y[i] = radius_b*sin(th);
-                spiral_xdot[i] = dr_a*cos(th) - radius_a*sin(th)*dth;
-                spiral_ydot[1] = dr_b*sin(th) + radius_b*cos(th)*dth;
+                spiral_xdot[i] = dr_a*cos(th) - radius_a*sin(th)*dth_spiral;
+                spiral_ydot[1] = dr_b*sin(th) + radius_b*cos(th)*dth_spiral;
             };
 
 
@@ -261,10 +273,7 @@ int main (void)
             t.reset();
             t.start();
             encoderA.reset();
-            encoderB.reset();
-            encoderC.reset();
-            encoderD.reset();
-
+        
             motorShield.motorAWrite(0, 0); //turn motor A off
             // motorShield.motorBWrite(0, 0); //turn motor B off
             sarrusservo.write(90); //sets servo to midpoint
@@ -311,26 +320,25 @@ int main (void)
 
                 //These are really long and crazy - check the jacobian derivation in MATLAB code
 
-                float Jx_h = (l_HoopG*sin(acos((h^2 - l_DE^2 + l_HoopG^2)/(2*h*l_HoopG)) + PI/2)*cos(phi)*(1/l_HoopG - (h^2 - l_DE^2 + l_HoopG^2)/(2*h^2*l_HoopG)))/(1 - (h^2 - l_DE^2 + l_HoopG^2)^2/(4*h^2*l_HoopG^2))^(1/2);
-                float Jx_phi= -l_HoopG*cos(acos((h^2 - l_DE^2 + l_HoopG^2)/(2*h*l_HoopG)) + PI/2)*sin(phi);
-                float Jy_h = (l_HoopG*sin(acos((h^2 - l_DE^2 + l_HoopG^2)/(2*h*l_HoopG)) + PI/2)*sin(phi)*(1/l_HoopG - (h^2 - l_DE^2 + l_HoopG^2)/(2*h^2*l_HoopG)))/(1 - (h^2 - l_DE^2 + l_HoopG^2)^2/(4*h^2*l_HoopG^2))^(1/2);
-                float Jy_phi = l_HoopG*cos(acos((h^2 - l_DE^2 + l_HoopG^2)/(2*h*l_HoopG)) + PI/2)*cos(phi);
- 
+                float Jx_h = (l_HoopG*sin(acos(pow(h,2) - pow(l_DE,2) + pow(l_HoopG,2)/(2*h*l_HoopG)) + PI/2)*cos(phi)*(1/l_HoopG - (pow(h,2) - pow(l_DE,2) + pow(l_HoopG,2)/(2*pow(h,2)*l_HoopG))))/(1 - (pow(h,2) - pow(l_DE,2) + pow(l_HoopG,2)/pow((4*pow(h,2)*pow(l_HoopG,2)),0.5)));
+                float Jx_phi= -l_HoopG*cos(acos((pow(h,2) - pow(l_DE,2) + pow(l_HoopG,2))/(2*h*l_HoopG)) + PI/2)*sin(phi);
+                float Jy_h = (l_HoopG*sin(acos((pow(h,2) - pow(l_DE,2) + pow(l_HoopG,2))/(2*h*l_HoopG)) + PI/2)*sin(phi)*(1/l_HoopG - (pow(h,2) - pow(l_DE,2) + pow(l_HoopG,2))/(2*pow(h,2)*l_HoopG)))/pow(1 - pow(pow(h,2) - pow(l_DE,2) + pow(l_HoopG,2), 2)/(4*pow(h,2)*pow(l_HoopG,2)), 0.5);
+                float Jy_phi = l_HoopG*cos(acos((pow(h,2) - pow(l_DE,2) + pow(l_HoopG,2))/(2*h*l_HoopG)) + PI/2)*cos(phi);
                                 
                 //Calculate the total Jacobian (J2*J1)
-J 
+
                 float Jx_th1 = Jh_th1*Jx_h + Jphi_th1*Jx_phi;
                 float Jx_th2 = Jh_th2*Jx_h + Jphi_th2*Jx_phi;
                 float Jy_th1 = Jh_th1*Jy_h + Jphi_th1*Jy_phi;
                 float Jy_th2 = Jh_th2*Jy_h + Jphi_th2*Jy_phi;
                 // Calculate the forward kinematics (position and velocity) // calculate xF and yF
-                float xHoop = l_HoopG*cos(acos((h^2 - l_DE^2 + l_HoopG^2)/(2*h*l_HoopG)) + PI/2)*cos(th1);
-                float yHoop = l_HoopG*cos(acos((h^2 - l_DE^2 + l_HoopG^2)/(2*h*l_HoopG)) + PI/2)*sin(th1);
+                float xHoop = l_HoopG*cos(acos((pow(h,2) - pow(l_DE,2) + pow(l_HoopG,2))/(2*h*l_HoopG)) + PI/2)*cos(th1);
+                float yHoop = l_HoopG*cos(acos((pow(h,2) - pow(l_DE,2) + pow(l_HoopG,2))/(2*h*l_HoopG)) + PI/2)*sin(th1);
 
                 //These are really long and crazy - check the jacobian derivation in MATLAB code
 
-                float dxHoop = (dh*l_HoopG*sin(acos((h^2 - l_DE^2 + l_HoopG^2)/(2*h*l_HoopG)) + PI/2)*cos(th1)*(1/l_HoopG - (h^2 - l_DE^2 + l_HoopG^2)/(2*h^2*l_HoopG)))/(1 - (h^2 - l_DE^2 + l_HoopG^2)^2/(4*h^2*l_HoopG^2))^(1/2) - dth1*l_HoopG*cos(acos((h^2 - l_DE^2 + l_HoopG^2)/(2*h*l_HoopG)) + PI/2)*sin(phi);
-                float dyHoop = dth1*l_HoopG*cos(acos((h^2 - l_DE^2 + l_HoopG^2)/(2*h*l_HoopG)) + PI/2)*cos(th1) + (dh*l_HoopG*sin(acos((h^2 - l_DE^2 + l_HoopG^2)/(2*h*l_HoopG)) + PI/2)*sin(th1)*(1/l_HoopG - (h^2 - l_DE^2 + l_HoopG^2)/(2*h^2*l_HoopG)))/(1 - (h^2 - l_DE^2 + l_HoopG^2)^2/(4*h^2*l_HoopG^2))^(1/2);
+                float dxHoop = 0;  //(dh*l_HoopG*sin(acos((h^2 - l_DE^2 + l_HoopG^2)/(2*h*l_HoopG)) + PI/2)*cos(th1)*(1/l_HoopG - (h^2 - l_DE^2 + l_HoopG^2)/(2*h^2*l_HoopG)))/(1 - (h^2 - l_DE^2 + l_HoopG^2)^2/(4*h^2*l_HoopG^2))^(1/2) - dth1*l_HoopG*cos(acos((h^2 - l_DE^2 + l_HoopG^2)/(2*h*l_HoopG)) + PI/2)*sin(phi);
+                float dyHoop = 0; //dth1*l_HoopG*cos(acos((h^2 - l_DE^2 + l_HoopG^2)/(2*h*l_HoopG)) + PI/2)*cos(th1) + (dh*l_HoopG*sin(acos((h^2 - l_DE^2 + l_HoopG^2)/(2*h*l_HoopG)) + PI/2)*sin(th1)*(1/l_HoopG - (h^2 - l_DE^2 + l_HoopG^2)/(2*h^2*l_HoopG)))/(1 - (h^2 - l_DE^2 + l_HoopG^2)^2/(4*h^2*l_HoopG^2))^(1/2);
  
    
 
@@ -369,7 +377,7 @@ J
                 // Get desired workspace point from spiral
                 float rDesContact[2] , vDesContact[2];
                 for (int i = 0; i<(N-1); i++) {
-                    if (teff == t_spiral[i] | i == N-1) {
+                    if (teff == spiral_t[i] | i == N-1) {
                         // Set exact value
                         rDesContact[0] = spiral_x[i];
                         rDesContact[1] = spiral_y[i];
@@ -377,9 +385,9 @@ J
                         vDesContact[1] = spiral_ydot[i];
                         break;
                     }
-                    else if (teff >= t_spiral[i] & teff < t_spiral[i+1]) {
+                    else if (teff >= spiral_t[i] & teff < spiral_t[i+1]) {
                         // Interpolate
-                        float delta = (teff - t_spiral[i])/(t_spiral[i+1] - t_spiral[i]);
+                        float delta = (teff - spiral_t[i])/(spiral_t[i+1] - spiral_t[i]);
                         rDesContact[0] = spiral_x[i] + delta*(spiral_x[i+1] - spiral_x[i]);
                         rDesContact[1] = spiral_y[i] + delta*(spiral_y[i+1] - spiral_y[i]);
                         vDesContact[0] = spiral_xdot[i] + delta*(spiral_xdot[i+1] - spiral_xdot[i]);
@@ -396,7 +404,7 @@ J
                 // Calculate the inverse kinematics (joint positions and velocities) for desired joint angles              
                 float xHoop_inv = -rDesContact[0];
                 float yHoop_inv = rDesContact[1];                
-                float r = sqrt( pow(xFoot_inv,2) + pow(yFoot_inv,2) );
+                float r = sqrt(pow(xHoop_inv,2) + pow(yHoop_inv,2) );
                 float gamma = abs(acos(r/l_HoopG)); 
                 float alpha = 3.14159f-gamma; 
                 float h_des1 = cos(alpha)*(l_EHoop + l_HoopG); 
@@ -407,12 +415,12 @@ J
                 float th1_des = -(3.14159f/2.0f) + atan2(yHoop_inv,xHoop_inv); 
                 
                 float dd = (Jx_th1*Jy_th2 - Jx_th2*Jy_th1);
-                float dth1_des = (1.0f/dd) * (  Jy_th2*vDesFoot[0] - Jx_th2*vDesFoot[1] );
-                float dth2_des = (1.0f/dd) * ( -Jy_th1*vDesFoot[0] + Jx_th1*vDesFoot[1] );
+                //float dth1_des = (1.0f/dd) * (  Jy_th2*vDesHoop[0] - Jx_th2*vDesHoop[1] );
+                //float dth2_des = (1.0f/dd) * ( -Jy_th1*vDesHoop[0] + Jx_th1*vDesHoop[1] );
         
                 // Calculate error variables
                 float e_x = rDesContact[0] - xHoop;
-                float e_y = rDesContact[1] - yHoop
+                float e_y = rDesContact[1] - yHoop;
                 float de_x = vDesContact[0] - dxHoop;
                 float de_y = vDesContact[1] - dyHoop;
         
@@ -420,8 +428,8 @@ J
                 float fx = K_xx*e_x + K_xy*e_y + D_xx*de_x + D_xy*de_y;
                 float fy = K_xy*e_x + K_yy*e_y + D_xy*de_x + D_yy*de_y;
                 
-                current_des1 = (Jx_th1*f_x + Jy_th1*f_y)/k_t;
-                current_des2 = (Jy_th2*f_y + Jx_th2*f_x)/k_t; 
+                current_des1 = (Jx_th1*fx + Jy_th1*fy)/k_t;
+                current_des2 = (Jy_th2*fy + Jx_th2*fx)/k_t; 
 
                 // Form output to send to MATLAB     
                 float output_data[NUM_OUTPUTS];
@@ -440,10 +448,10 @@ J
                 output_data[9] = current_des2;
                 output_data[10]= phi_duty_cycle;
                 // foot state
-                output_data[11] = xContact;
-                output_data[12] = yContact;
-                output_data[13] = dxContact;
-                output_data[14] = dyContact;
+                output_data[11] = xHoop;
+                output_data[12] = yHoop;
+                output_data[13] = dxHoop;
+                output_data[14] = dyHoop;
                 output_data[15] = rDesContact[0];
                 output_data[16] = rDesContact[1];
                 output_data[17] = vDesContact[0];
