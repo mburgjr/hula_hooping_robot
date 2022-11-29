@@ -311,20 +311,31 @@ int main (void)
                 float phi = th1;
                 float dphi = dth1;
 
+
+
+
+                // TODO: Are these correct ?????
                 float Jh_th1 = 0;
                 float Jh_th2 = 2*l_AB*sin(th2);
                 float Jphi_th1 = 1;
                 float Jphi_th2 = 0;
 
+
+
+
                 // Calculate the Jacobian 2 (from phi,h to xHoop, yHoop) 
 
                 //These are really long and crazy - check the jacobian derivation in MATLAB code
 
-                float Jx_h = (l_HoopG*sin(acos(pow(h,2) - pow(l_DE,2) + pow(l_HoopG,2)/(2*h*l_HoopG)) + PI/2)*cos(phi)*(1/l_HoopG - (pow(h,2) - pow(l_DE,2) + pow(l_HoopG,2)/(2*pow(h,2)*l_HoopG))))/(1 - (pow(h,2) - pow(l_DE,2) + pow(l_HoopG,2)/pow((4*pow(h,2)*pow(l_HoopG,2)),0.5)));
-                float Jx_phi= -l_HoopG*cos(acos((pow(h,2) - pow(l_DE,2) + pow(l_HoopG,2))/(2*h*l_HoopG)) + PI/2)*sin(phi);
-                float Jy_h = (l_HoopG*sin(acos((pow(h,2) - pow(l_DE,2) + pow(l_HoopG,2))/(2*h*l_HoopG)) + PI/2)*sin(phi)*(1/l_HoopG - (pow(h,2) - pow(l_DE,2) + pow(l_HoopG,2))/(2*pow(h,2)*l_HoopG)))/pow(1 - pow(pow(h,2) - pow(l_DE,2) + pow(l_HoopG,2), 2)/(4*pow(h,2)*pow(l_HoopG,2)), 0.5);
-                float Jy_phi = l_HoopG*cos(acos((pow(h,2) - pow(l_DE,2) + pow(l_HoopG,2))/(2*h*l_HoopG)) + PI/2)*cos(phi);
-                                
+                float l_EG = l_EHoop + l_HoopG;
+                float coeff1 = 2*h*h*sqrt(-pow(h,4) + 2*h*h*l_DE*l_DE + 2*h*h*l_EG*l_EG - pow(l_DE,4) + 2*l_DE*l_DE*l_EG*l_EG - pow(l_EG,4));
+                float coeff2 = sqrt((h + l_DE + l_EG)*(h + l_DE - l_EG)*(h - l_DE + l_EG)*(-h + l_DE + l_EG));
+                float coeff3 = pow(h,4) - pow(l_DE,4) + 2*l_DE*l_DE*l_EG*l_EG - pow(l_EG,4);
+                float Jx_h = -cos(phi)*coeff3/coeff1;
+                float Jx_phi = -sin(phi)*coeff3/coeff1;
+                float Jy_h = -sin(phi)*coeff2/(2*h);
+                float Jy_phi = cos(phi)*coeff2/(2*h);
+
                 //Calculate the total Jacobian (J2*J1)
 
                 float Jx_th1 = Jh_th1*Jx_h + Jphi_th1*Jx_phi;
@@ -332,14 +343,15 @@ int main (void)
                 float Jy_th1 = Jh_th1*Jy_h + Jphi_th1*Jy_phi;
                 float Jy_th2 = Jh_th2*Jy_h + Jphi_th2*Jy_phi;
                 // Calculate the forward kinematics (position and velocity) // calculate xF and yF
-                float xHoop = l_HoopG*cos(acos((pow(h,2) - pow(l_DE,2) + pow(l_HoopG,2))/(2*h*l_HoopG)) + PI/2)*cos(th1);
-                float yHoop = l_HoopG*cos(acos((pow(h,2) - pow(l_DE,2) + pow(l_HoopG,2))/(2*h*l_HoopG)) + PI/2)*sin(th1);
+                float xHoop = cos(phi)*coeff2/(2*h);
+                float yHoop = sin(phi)*coeff2/(2*h);
 
                 //These are really long and crazy - check the jacobian derivation in MATLAB code
 
-                float dxHoop = 0;  //(dh*l_HoopG*sin(acos((h^2 - l_DE^2 + l_HoopG^2)/(2*h*l_HoopG)) + PI/2)*cos(th1)*(1/l_HoopG - (h^2 - l_DE^2 + l_HoopG^2)/(2*h^2*l_HoopG)))/(1 - (h^2 - l_DE^2 + l_HoopG^2)^2/(4*h^2*l_HoopG^2))^(1/2) - dth1*l_HoopG*cos(acos((h^2 - l_DE^2 + l_HoopG^2)/(2*h*l_HoopG)) + PI/2)*sin(phi);
-                float dyHoop = 0; //dth1*l_HoopG*cos(acos((h^2 - l_DE^2 + l_HoopG^2)/(2*h*l_HoopG)) + PI/2)*cos(th1) + (dh*l_HoopG*sin(acos((h^2 - l_DE^2 + l_HoopG^2)/(2*h*l_HoopG)) + PI/2)*sin(th1)*(1/l_HoopG - (h^2 - l_DE^2 + l_HoopG^2)/(2*h^2*l_HoopG)))/(1 - (h^2 - l_DE^2 + l_HoopG^2)^2/(4*h^2*l_HoopG^2))^(1/2);
- 
+                float denom1 = 2*dh*cos(phi)*(pow(h,4) - h*h*(l_EG*l_EG + l_DE*l_DE)) + (dh*cos(phi) + dphi*h*sin(phi))*coeff3*coeff3;
+                float dxHoop = -denom1/(2*h*h*coeff3);
+                float denom2 = 2*dh*sin(phi)*(h*h*(l_DE*l_DE + l_EG*l_EG) - pow(h,4)) + (dphi*h*cos(phi) - dh*sin(phi))*coeff3*coeff3;
+                float dyHoop = denom2/(2*h*h*coeff3);
    
 
                 // TO ADJUST 
