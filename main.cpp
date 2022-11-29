@@ -232,32 +232,6 @@ int main (void)
             float dr_a = (a_lower - a_upper) / traj_time;
             float dr_b = (b_lower - b_upper) / traj_time;
 
-            // Create trajectory to interpolate from
-            float N = 100.0f;
-            float dt = traj_time / N;
-            float spiral_t[100];
-            float spiral_x[100];
-            float spiral_y[100];
-            float spiral_xdot[100];
-            float spiral_ydot[100];
-
-            float th = 0;
-            for(int i = 0; i<N; i++) {
-                float t = i*dt;
-                float radius_a = a_upper + dr_a*t;
-                float radius_b = b_upper + dr_a*t;
-                float r_spiral = sqrt(pow(radius_a,2) + pow(radius_b,2));
-
-                float dth_spiral = v_spiral* pow(r_spiral,-1);
-                th += dth_spiral*dt;
-            
-                spiral_t[i] = t;
-                spiral_x[i] = radius_a*cos(th);
-                spiral_y[i] = radius_b*sin(th);
-                spiral_xdot[i] = dr_a*cos(th) - radius_a*sin(th)*dth_spiral;
-                spiral_ydot[1] = dr_b*sin(th) + radius_b*cos(th)*dth_spiral;
-            };
-
             // Attach current loop interrupt
             currentLoop.attach_us(CurrentLoop,current_control_period_us);
                         
@@ -279,11 +253,11 @@ int main (void)
                 angle1 = encoderA.getPulses() *PULSE_TO_RAD + angle1_init;       
                 velocity1 = encoderA.getVelocity() * PULSE_TO_RAD;
 
-                //servo current angle 
+                // Servo current angle 
                 angle2 = sarrusservo.read(); 
                 dt = t.read() - timer1;
                 timer1 = t.read(); 
-                //servo velocity
+                // Servo velocity
                 velocity2 = (angle2-angle2_prev)/dt; //Servo angular velocity but unsure how to get this 
                 angle2_prev = angle2; 
 
@@ -314,42 +288,27 @@ int main (void)
 
 
                 // Calculate the Jacobian 2 (from phi,h to xHoop, yHoop) 
-
                 // These are really long and crazy - check the jacobian derivation in MATLAB code
-
                 float l_EG = l_EHoop + l_HoopG;
                 float coeff1 = 2.0*h*h*sqrt(abs(-pow(h,4) + 2.0*h*h*l_DE*l_DE + 2.0*h*h*l_EG*l_EG - pow(l_DE,4) + 2.0*l_DE*l_DE*l_EG*l_EG - pow(l_EG,4)));
                 float coeff2 = sqrt(abs((h + l_DE + l_EG)*(h + l_DE - l_EG)*(h - l_DE + l_EG)*(-h + l_DE + l_EG)));
                 float coeff3 = pow(h,4) - pow(l_DE,4) + 2.0*l_DE*l_DE*l_EG*l_EG - pow(l_EG,4);
-                
-                pc.printf("%f", coeff1);
-                pc.printf("%f", coeff2);
-                pc.printf("%f", coeff3);
-                
                 float Jx_h = -cos(phi)*coeff3/coeff1;
                 float Jx_phi = -sin(phi)*coeff3/coeff1;
                 float Jy_h = -sin(phi)*coeff2/(2*h);
                 float Jy_phi = cos(phi)*coeff2/(2*h);
 
                 // Calculate the total Jacobian (J2*J1)
-
                 float Jx_th1 = Jh_th1*Jx_h + Jphi_th1*Jx_phi;
                 float Jx_th2 = Jh_th2*Jx_h + Jphi_th2*Jx_phi;
                 float Jy_th1 = Jh_th1*Jy_h + Jphi_th1*Jy_phi;
                 float Jy_th2 = Jh_th2*Jy_h + Jphi_th2*Jy_phi;
+
                 // Calculate the forward kinematics (position and velocity) // calculate xF and yF
                 float xHoop = cos(phi)*coeff2/(2*h);
                 float yHoop = sin(phi)*coeff2/(2*h);
-                
-//                pc.printf("%f", Jx_th1);
-//                pc.printf("%f", Jx_th2);
-//                pc.printf("%f", Jy_th1);
-//                pc.printf("%f", Jy_th2);
-//                pc.printf("%f", xHoop);
-//                pc.printf("%f", yHoop);
 
                 //These are really long and crazy - check the jacobian derivation in MATLAB code
-
                 float denom1 = 2*dh*cos(phi)*(pow(h,4) - h*h*(l_EG*l_EG + l_DE*l_DE)) + (dh*cos(phi) + dphi*h*sin(phi))*coeff3*coeff3;
                 float dxHoop = -denom1/(2*h*h*coeff3);
                 float denom2 = 2*dh*sin(phi)*(h*h*(l_DE*l_DE + l_EG*l_EG) - pow(h,4)) + (dphi*h*cos(phi) - dh*sin(phi))*coeff3*coeff3;
@@ -387,32 +346,20 @@ int main (void)
                     teff = traj_time;
                     vMult = 0;
                 }
-                
+
+                // Spiral parameters
+                float spiral_time = t.read();
+                float radius_a = a_upper + dr_a*spiral_time;
+                float radius_b = b_upper + dr_a*spiral_time;
+                float r_spiral = sqrt(pow(radius_a,2) + pow(radius_b,2));
+                float dth_spiral = v_spiral* pow(r_spiral,-1);
+
                 // Get desired workspace point from spiral
                 float rDesContact[2] , vDesContact[2];
-                for (int i = 0; i<(N-1); i++) {
-                    if (teff == spiral_t[i] | i == N-1) {
-                        // Set exact value
-                        rDesContact[0] = spiral_x[i];
-                        rDesContact[1] = spiral_y[i];
-                        vDesContact[0] = spiral_xdot[i];
-                        vDesContact[1] = spiral_ydot[i];
-                        break;
-                    }
-                    else if (teff >= spiral_t[i] & teff < spiral_t[i+1]) {
-                        // Interpolate
-                        float delta = (teff - spiral_t[i])/(spiral_t[i+1] - spiral_t[i]);
-                        rDesContact[0] = spiral_x[i] + delta*(spiral_x[i+1] - spiral_x[i]);
-                        rDesContact[1] = spiral_y[i] + delta*(spiral_y[i+1] - spiral_y[i]);
-                        vDesContact[0] = spiral_xdot[i] + delta*(spiral_xdot[i+1] - spiral_xdot[i]);
-                        vDesContact[1] = spiral_ydot[i] + delta*(spiral_ydot[i+1] - spiral_ydot[i]);
-                        break;
-                    };
-
-                };
-                
-
-
+                rDesContact[0] = radius_a*cos(th1);
+                rDesContact[1] = radius_b*sin(th1);
+                vDesContact[0] = dr_a*cos(th1) - radius_a*sin(th1)*dth_spiral;
+                vDesContact[1] = dr_b*sin(th1) + radius_b*cos(th1)*dth_spiral;
 
                 // ADJUSTED
                 // Calculate the inverse kinematics (joint positions and velocities) for desired joint angles              
@@ -439,8 +386,10 @@ int main (void)
                 // Calculate virtual force on foot
                 float fx = K_xx*e_x + K_xy*e_y + D_xx*de_x + D_xy*de_y;
                 float fy = K_xy*e_x + K_yy*e_y + D_xy*de_x + D_yy*de_y;
+                float fxd = D_xx*de_x + D_xy*de_y;
+                float fyd = D_xy*de_x + D_yy*de_y;
                 
-                current_des1 = (Jx_th1*fx + Jy_th1*fy)/k_t;
+                current_des1 = (Jx_th1*fxd + Jy_th1*fyd)/k_t;
                 current_des2 = (Jy_th2*fy + Jx_th2*fx)/k_t; 
 
                 // Form output to send to MATLAB     
