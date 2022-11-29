@@ -255,7 +255,7 @@ int main (void)
 
                 // Servo current angle 
                 angle2 = sarrusservo.read(); 
-                dt = t.read() - timer1;
+                float dt = t.read() - timer1;
                 timer1 = t.read(); 
                 // Servo velocity
                 velocity2 = (angle2-angle2_prev)/dt; //Servo angular velocity but unsure how to get this 

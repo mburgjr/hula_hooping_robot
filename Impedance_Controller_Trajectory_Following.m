@@ -19,16 +19,16 @@ b_lower = R_hoop/5; % m     Final radius on y-axis
 
 a_spiral = [a_upper a_lower];
 b_spiral = [b_upper b_lower];
-v_spiral = 1; % m/s         Traversal speed
+v_spiral = 3; % m/s         Traversal speed
         
 % Initial values of gen coords
 h_init = 0;
 phi_init = 0;
 
 % Total experiment time is buffer,trajectory,buffer
-pre_buffer_time   = 0;
-traj_time         = 3;
-post_buffer_time  = 0;
+pre_buffer_time   = 10;
+traj_time         = 1;
+post_buffer_time  = 1;
 
 % Gains for impedance controller
 % If a gain is not being used in your Mbed code, set it to zero
