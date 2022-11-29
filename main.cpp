@@ -9,7 +9,6 @@
 #include "Matrix.h"
 #include "MatrixMath.h"
 #include "Servo.h"
-#include "millis.h"
 
 #define NUM_INPUTS 17
 #define NUM_OUTPUTS 19
@@ -18,7 +17,7 @@
 #define PULSE_TO_RAD (2.0f*3.14159f / 1200.0f)
 
 // Initializations
-Serial pc(USBTX, USBRX);    // USB Serial Terminal
+Serial pc(USBTX, USBRX, 115200);    // USB Serial Terminal
 ExperimentServer server;    // Object that lets us communicate with MATLAB
 Timer t;                    // Timer to measure elapsed time of experiment
 Servo sarrusservo(PB_3); //adjust PIN!
@@ -50,7 +49,7 @@ float h_duty_cycle;
 float h_init;
 float angle1_init = 0; 
 
-unsigned long timer;
+unsigned long timer1;
 
 // Variables for q2 (phi)
 float current2;
@@ -202,9 +201,8 @@ int main (void)
     while(1) {
         
         // If there are new inputs, this code will run
-        if (server.getParams(input_params,NUM_INPUTS)) {
+        if (server.getParams(input_params,NUM_INPUTS)) {     
             
-                        
             // Get inputs from MATLAB          
             start_period                = input_params[0];    // First buffer time, before trajectory (s)
             traj_time                   = input_params[1];    // Trajectory time/length (s)
@@ -232,13 +230,13 @@ int main (void)
             float dr_b = (b_lower - b_upper) / traj_time;
 
             // Create trajectory to interpolate from
-            int N = 500;
+            float N = 100.0f;
             float dt = traj_time / N;
-            float spiral_t[N];
-            float spiral_x[N];
-            float spiral_y[N];
-            float spiral_xdot[N];
-            float spiral_ydot[N];
+            float spiral_t[100];
+            float spiral_x[100];
+            float spiral_y[100];
+            float spiral_xdot[100];
+            float spiral_ydot[100];
 
             float th = 0;
             for(int i = 0; i<N; i++) {
@@ -257,15 +255,6 @@ int main (void)
                 spiral_ydot[1] = dr_b*sin(th) + radius_b*cos(th)*dth_spiral;
             };
 
-
-
-
-            // NOTE: I changed angle1 => h and angle2 => phi
-            
-            
-
-
-
             // Attach current loop interrupt
             currentLoop.attach_us(CurrentLoop,current_control_period_us);
                         
@@ -278,8 +267,8 @@ int main (void)
             // motorShield.motorBWrite(0, 0); //turn motor B off
             sarrusservo.write(90); //sets servo to midpoint
             float angle2_prev = 90;
-            timer = millis(); 
-
+            timer1 = t.read(); 
+            
             // Run experiment
             while( t.read() < start_period + traj_period + end_period) { 
                  
@@ -289,8 +278,8 @@ int main (void)
 
                 //servo current angle 
                 float angle2 = sarrusservo.read(); 
-                dt = millis()-timer;
-                timer = millis(); 
+                dt = t.read() - timer1;
+                timer1 = t.read(); 
                 //servo velocity
                 float velocity2 = (angle2-angle2_prev)/dt; //Servo angular velocity but unsure how to get this 
                 angle2_prev = angle2; 
@@ -369,7 +358,7 @@ int main (void)
                     }
                     teff = 0;
                 }
-                else if (t < start_period + traj_period)
+                else if (t < start_period + traj_time)
                 {
                     K_xx = input_params[5];  // Foot stiffness N/m
                     K_yy = input_params[6];  // Foot stiffness N/m
@@ -382,7 +371,7 @@ int main (void)
                 }
                 else
                 {
-                    teff = traj_period;
+                    teff = traj_time;
                     vMult = 0;
                 }
                 
@@ -442,6 +431,9 @@ int main (void)
                 
                 current_des1 = (Jx_th1*fx + Jy_th1*fy)/k_t;
                 current_des2 = (Jy_th2*fy + Jx_th2*fx)/k_t; 
+                
+                pc.printf("%f", current_des1);
+                pc.printf("%f", current_des2);
 
                 // Form output to send to MATLAB     
                 float output_data[NUM_OUTPUTS];
