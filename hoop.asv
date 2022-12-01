@@ -17,16 +17,16 @@ N = length(t);
 
 % Spiral input (if not sweeping)
 % NOTE: Keep upper / lower equal for simple ellipse
-a_upper = R_hoop/10; % m       Initial radius on x-axis
-a_lower = R_hoop/10; % m    Final radius on x-axis
-b_upper = R_hoop/10; % m       Initial radius on y-axis
-b_lower = R_hoop/10; % m     Final radius on y-axis
-v_spiral = 5; % m/s         Traversal speed
+a_upper = R_hoop; % m       Initial radius on x-axis
+a_lower = R_hoop; % m    Final radius on x-axis
+b_upper = R_hoop; % m       Initial radius on y-axis
+b_lower = R_hoop; % m     Final radius on y-axis
+v_spiral = 0.5; % m/s         Traversal speed
 
 % Run sweep
 sweep = true;
 R_sweep = R_hoop/10:R_hoop/10:R_hoop; % m
-v_sweep = 0.5:0.25:5; % m/s
+v_sweep = 1:0.25:5; % m/s
 
 if sweep
     phase_diff_res = zeros([length(R_sweep) length(v_sweep)]);
@@ -103,7 +103,7 @@ for R_i = 1:size(phase_diff_res, 1)
         % Forward simulation (from person to hoop)
         F_contact = zeros([2 N]);
         dist_to_contact = zeros([1 N]);
-        ss_threshold = 0.0125;
+        ss_threshold = 0.015;
         rise_time = inf;
         phase_diff_sum = 0;
         phase_diff_n = 0;
@@ -173,8 +173,6 @@ for R_i = 1:size(phase_diff_res, 1)
 
         phase_diff_res(R_i, v_i) = phase_diff;
         rise_time_res(R_i, v_i) = rise_time;
-
-        disp([v_spiral ])
     end
 end
 
@@ -285,14 +283,14 @@ if sweep == false
 
 else
     % Plot sweep graphs
-    figure, imagesc(R_sweep, v_sweep, rise_time_res);
-    colormap("winter");
+    figure, imagesc(R_sweep, v_sweep, rise_time_res');
+    colormap([0:1:255, 255:-1:255, zeros(255,1)]);
     colorbar;
     xlabel('Trajectory radius (m)');
     ylabel('Traversal speed (m/s)');
     title('Rise time of hoop');
 
-    figure, imagesc(R_sweep, v_sweep, phase_diff_res);
+    figure, imagesc(R_sweep, v_sweep, phase_diff_res');
     colormap("winter");
     colorbar;
     xlabel('Trajectory radius (m)');

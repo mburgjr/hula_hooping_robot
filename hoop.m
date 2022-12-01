@@ -147,10 +147,10 @@ for R_i = 1:size(phase_diff_res, 1)
             p_hoop(:, i+1) = p_hoop(:,i) + dt*v_hoop(:,i+1);
             ang_hoop(i+1) = atan2(p_hoop(2,i+1), p_hoop(1,i+1));
         
-            if i > 750 && rise_time > N*dt
+            if i > 500 && rise_time > N*dt
                 % Check is we have reached steady state based on average distance
-                if mean(dist_to_contact(i-750:i)) <= ss_threshold
-                    rise_time = (i-750)*dt;
+                if mean(dist_to_contact(i-500:i)) <= ss_threshold
+                    rise_time = (i-500)*dt;
                 end
             end
         
@@ -284,14 +284,14 @@ if sweep == false
 else
     % Plot sweep graphs
     figure, imagesc(R_sweep, v_sweep, rise_time_res');
-    colormap("winter");
+    colormap([(0:0.01:1)', (1:-0.01:0)', 0.15*ones(101,1)]);
     colorbar;
     xlabel('Trajectory radius (m)');
     ylabel('Traversal speed (m/s)');
     title('Rise time of hoop');
 
     figure, imagesc(R_sweep, v_sweep, phase_diff_res');
-    colormap("winter");
+    colormap([(0:0.01:1)', (1:-0.01:0)', 0.15*ones(101,1)]);
     colorbar;
     xlabel('Trajectory radius (m)');
     ylabel('Traversal speed (m/s)');
