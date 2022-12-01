@@ -17,19 +17,19 @@ N = length(t);
 
 % Spiral input (if not sweeping)
 % NOTE: Keep upper / lower equal for simple ellipse
-a_upper = R_hoop/4; % m       Initial radius on x-axis
-a_lower = R_hoop/4; % m    Final radius on x-axis
-b_upper = R_hoop/4; % m       Initial radius on y-axis
-b_lower = R_hoop/4; % m     Final radius on y-axis
-v_spiral = 3; % m/s         Traversal speed
+a_upper = R_hoop/3; % m         Initial radius on x-axis
+a_lower = R_hoop/3; % m         Final radius on x-axis
+b_upper = R_hoop/3; % m         Initial radius on y-axis
+b_lower = R_hoop/3; % m         Final radius on y-axis
+dphi = 10*pi; % rad/sec         Spin speed
 
 % Run sweep
-sweep = false;
-R_sweep = R_hoop/10:R_hoop/10:R_hoop; % m
-v_sweep = 1:0.25:5; % m/s
+sweep = true;
+R_sweep = R_hoop/10:R_hoop/20:R_hoop; % m
+dphi_sweep = pi:pi:10*pi; % m/s
 
 if sweep
-    phase_diff_res = zeros([length(R_sweep) length(v_sweep)]);
+    phase_diff_res = zeros([length(R_sweep) length(d_sweep)]);
     rise_time_res = zeros([length(R_sweep) length(v_sweep)]);
 else
     phase_diff_res = zeros([1 1]);
@@ -44,7 +44,7 @@ for R_i = 1:size(phase_diff_res, 1)
             % Unpack circular parameters
             a = [R_sweep(R_i) R_sweep(R_i)];
             b = [R_sweep(R_i) R_sweep(R_i)];
-            v_spiral = v_sweep(v_i);
+            dphi_spiral = dphi_sweep(v_i);
         else
             % Generate spiral trajectory of person
             a = [a_upper a_lower]; % Change of x-axis radius from start to end
@@ -59,7 +59,7 @@ for R_i = 1:size(phase_diff_res, 1)
         
         % Calculate angle change
         r_spiral = (radius_a.^2 + radius_b.^2).^0.5;
-        dth_spiral = v_spiral*(r_spiral.^-1);
+        dth_spiral = dphi*ones(size(r_spiral));
         th_spiral = zeros([1 N+1]);
         
         p_person = zeros([2 N]);    % [x, y] x N
@@ -102,9 +102,8 @@ for R_i = 1:size(phase_diff_res, 1)
         
         % Forward simulation (from person to hoop)
         F_contact = zeros([2 N]);
-        ss_force_threshold = 200; % N
-        phase_diff_n = zeros([1 N]);
-        rise_time = inf;
+        ss_force_threshold = 150; % N
+        phase_diff_log = zeros([1 N]);
         
         % Iterate for timesteps
         for i = 1:N-1
@@ -114,7 +113,6 @@ for R_i = 1:size(phase_diff_res, 1)
         
             % Check if hoop and person are in contact
             dist_btwn = norm(p_person(:, i) - p_hoop(1:2, i));
-            dist_to_contact(i) = abs(dist_btwn - (R_hoop - R_person));
             contact = (dist_btwn >= R_hoop - R_person) &&...
                         (dist_btwn <= R_hoop + R_person);
         
@@ -148,16 +146,18 @@ for R_i = 1:size(phase_diff_res, 1)
             % Calculate and add to sum
             phase_diff_i = ang_hoop(i) - ang_person(i);
             phase_diff_i = mod((phase_diff_i + pi), 2*pi) - pi;
-        
+            phase_diff_log(i) = phase_diff_i;
         end
 
         % Determine when steady state is reached
-        mavg_Fc = movmean(vecnorm(F_contact, 1),500);
-        ss_index = find(mavg_Fc > ss_force_threshold,1);
-        if length(ss_index) > 0
+        mavg_Fc = movmean(vecnorm(F_contact, 1),300);
+        if sum(mavg_Fc > ss_force_threshold) > 0
+            ss_index = find(mavg_Fc > ss_force_threshold,1) + 300;
             rise_time = dt*ss_index;
             phase_diff = mean(phase_diff_log(ss_index:end));
         else
+            rise_time = inf;
+            phase_diff = inf;
         end
 
         phase_diff_res(R_i, v_i) = phase_diff;
@@ -168,7 +168,7 @@ end
 %% Display
 if sweep == false
     
-    watch_sim = false;
+    watch_sim = true;
     if watch_sim
         % Plot trajectory
         hold on
@@ -276,14 +276,14 @@ else
     colormap([(0:0.01:1)', (1:-0.01:0)', 0.15*ones(101,1)]);
     colorbar;
     xlabel('Trajectory radius (m)');
-    ylabel('Traversal speed (m/s)');
+    ylabel('Spin speed (rad/s)');
     title('Rise time of hoop');
 
     figure, imagesc(R_sweep, v_sweep, phase_diff_res');
     colormap([(0:0.01:1)', (1:-0.01:0)', 0.15*ones(101,1)]);
     colorbar;
     xlabel('Trajectory radius (m)');
-    ylabel('Traversal speed (m/s)');
+    ylabel('Spin speed (rad/s)');
     title('Phase difference of hoop');
 end
 

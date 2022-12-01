@@ -17,20 +17,20 @@ N = length(t);
 
 % Spiral input (if not sweeping)
 % NOTE: Keep upper / lower equal for simple ellipse
-a_upper = R_hoop/2; % m       Initial radius on x-axis
-a_lower = R_hoop/2; % m    Final radius on x-axis
-b_upper = R_hoop/2; % m       Initial radius on y-axis
-b_lower = R_hoop/2; % m     Final radius on y-axis
-v_spiral = 3; % m/s         Traversal speed
+a_upper = R_hoop/3; % m         Initial radius on x-axis
+a_lower = R_hoop/3; % m         Final radius on x-axis
+b_upper = R_hoop/3; % m         Initial radius on y-axis
+b_lower = R_hoop/3; % m         Final radius on y-axis
+dphi = 10*pi; % rad/sec         Spin speed
 
 % Run sweep
 sweep = true;
-R_sweep = R_hoop/10:R_hoop/20:R_hoop; % m
-v_sweep = 0.75:0.125:5; % m/s
+R_sweep = R_hoop/10:R_hoop/80:R_hoop; % m
+dphi_sweep = 2*pi:0.125*pi:10*pi; % m/s
 
 if sweep
-    phase_diff_res = zeros([length(R_sweep) length(v_sweep)]);
-    rise_time_res = zeros([length(R_sweep) length(v_sweep)]);
+    phase_diff_res = zeros([length(R_sweep) length(dphi_sweep)]);
+    rise_time_res = zeros([length(R_sweep) length(dphi_sweep)]);
 else
     phase_diff_res = zeros([1 1]);
     rise_time_res = zeros([1 1]);
@@ -38,17 +38,18 @@ end
 
 %% Run simulation
 for R_i = 1:size(phase_diff_res, 1)
-    for v_i = 1:size(phase_diff_res, 2)
+    for dphi_i = 1:size(phase_diff_res, 2)
         
         if sweep
             % Unpack circular parameters
             a = [R_sweep(R_i) R_sweep(R_i)];
             b = [R_sweep(R_i) R_sweep(R_i)];
-            v_spiral = v_sweep(v_i);
+            dphi_spiral = dphi_sweep(dphi_i);
         else
             % Generate spiral trajectory of person
             a = [a_upper a_lower]; % Change of x-axis radius from start to end
             b = [b_upper b_lower]; % Change of y-axis radius from start to end
+            dphi_spiral = dphi;
         end
         
         % Calculate radius change over axes
@@ -59,7 +60,7 @@ for R_i = 1:size(phase_diff_res, 1)
         
         % Calculate angle change
         r_spiral = (radius_a.^2 + radius_b.^2).^0.5;
-        dth_spiral = v_spiral*(r_spiral.^-1);
+        dth_spiral = dphi_spiral*ones(size(r_spiral));
         th_spiral = zeros([1 N+1]);
         
         p_person = zeros([2 N]);    % [x, y] x N
@@ -102,7 +103,7 @@ for R_i = 1:size(phase_diff_res, 1)
         
         % Forward simulation (from person to hoop)
         F_contact = zeros([2 N]);
-        ss_force_threshold = 150; % N
+        ss_force_threshold = 125; % N
         phase_diff_log = zeros([1 N]);
         
         % Iterate for timesteps
@@ -160,15 +161,15 @@ for R_i = 1:size(phase_diff_res, 1)
             phase_diff = inf;
         end
 
-        phase_diff_res(R_i, v_i) = phase_diff;
-        rise_time_res(R_i, v_i) = rise_time;
+        phase_diff_res(R_i, dphi_i) = phase_diff;
+        rise_time_res(R_i, dphi_i) = rise_time;
     end
 end
 
 %% Display
 if sweep == false
     
-    watch_sim = true;
+    watch_sim = false;
     if watch_sim
         % Plot trajectory
         hold on
@@ -271,19 +272,24 @@ if sweep == false
     hold off;
 
 else
+    load('colormaps/rainbow.mat');
+    load('colormaps/greenred.mat');
+
     % Plot sweep graphs
-    figure, imagesc(R_sweep, v_sweep, rise_time_res');
-    colormap([(0:0.01:1)', (1:-0.01:0)', 0.15*ones(101,1)]);
+    figure, imagesc(R_sweep, dphi_sweep, rise_time_res');
+    set(gca,'YDir','normal');
+    colormap(greenred);
     colorbar;
     xlabel('Trajectory radius (m)');
-    ylabel('Traversal speed (m/s)');
+    ylabel('Spin speed (rad/s)');
     title('Rise time of hoop');
 
-    figure, imagesc(R_sweep, v_sweep, phase_diff_res');
-    colormap([(0:0.01:1)', (1:-0.01:0)', 0.15*ones(101,1)]);
+    figure, imagesc(R_sweep, dphi_sweep, phase_diff_res');
+    set(gca,'YDir','normal');
+    colormap(greenred);
     colorbar;
     xlabel('Trajectory radius (m)');
-    ylabel('Traversal speed (m/s)');
+    ylabel('Spin speed (rad/s)');
     title('Phase difference of hoop');
 end
 
