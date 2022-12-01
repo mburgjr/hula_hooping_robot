@@ -17,16 +17,16 @@ N = length(t);
 
 % Spiral input (if not sweeping)
 % NOTE: Keep upper / lower equal for simple ellipse
-a_upper = R_hoop; % m       Initial radius on x-axis
-a_lower = R_hoop; % m    Final radius on x-axis
-b_upper = R_hoop; % m       Initial radius on y-axis
-b_lower = R_hoop; % m     Final radius on y-axis
-v_spiral = 0.5; % m/s         Traversal speed
+a_upper = R_hoop/2; % m       Initial radius on x-axis
+a_lower = R_hoop/2; % m    Final radius on x-axis
+b_upper = R_hoop/2; % m       Initial radius on y-axis
+b_lower = R_hoop/2; % m     Final radius on y-axis
+v_spiral = 3; % m/s         Traversal speed
 
 % Run sweep
 sweep = true;
-R_sweep = R_hoop/10:R_hoop/10:R_hoop; % m
-v_sweep = 1:0.25:5; % m/s
+R_sweep = R_hoop/10:R_hoop/20:R_hoop; % m
+v_sweep = 0.75:0.125:5; % m/s
 
 if sweep
     phase_diff_res = zeros([length(R_sweep) length(v_sweep)]);
@@ -102,11 +102,8 @@ for R_i = 1:size(phase_diff_res, 1)
         
         % Forward simulation (from person to hoop)
         F_contact = zeros([2 N]);
-        dist_to_contact = zeros([1 N]);
-        ss_threshold = 0.015;
-        rise_time = inf;
-        phase_diff_sum = 0;
-        phase_diff_n = 0;
+        ss_force_threshold = 150; % N
+        phase_diff_log = zeros([1 N]);
         
         % Iterate for timesteps
         for i = 1:N-1
@@ -116,7 +113,6 @@ for R_i = 1:size(phase_diff_res, 1)
         
             % Check if hoop and person are in contact
             dist_btwn = norm(p_person(:, i) - p_hoop(1:2, i));
-            dist_to_contact(i) = abs(dist_btwn - (R_hoop - R_person));
             contact = (dist_btwn >= R_hoop - R_person) &&...
                         (dist_btwn <= R_hoop + R_person);
         
@@ -147,28 +143,21 @@ for R_i = 1:size(phase_diff_res, 1)
             p_hoop(:, i+1) = p_hoop(:,i) + dt*v_hoop(:,i+1);
             ang_hoop(i+1) = atan2(p_hoop(2,i+1), p_hoop(1,i+1));
         
-            if i > 500 && rise_time > N*dt
-                % Check is we have reached steady state based on average distance
-                if mean(dist_to_contact(i-500:i)) <= ss_threshold
-                    rise_time = (i-500)*dt;
-                end
-            end
-        
-            % If in steady state, calculate phase difference
-            if rise_time < N*dt
-                % Calculate and add to sum
-                phase_diff_i = ang_hoop(i) - ang_person(i);
-                phase_diff_i = mod((phase_diff_i + pi), 2*pi) - pi;
-                phase_diff_sum = phase_diff_sum + phase_diff_i;
-                phase_diff_n = phase_diff_n + 1;
-            end
-        
+            % Calculate and add to sum
+            phase_diff_i = ang_hoop(i) - ang_person(i);
+            phase_diff_i = mod((phase_diff_i + pi), 2*pi) - pi;
+            phase_diff_log(i) = phase_diff_i;
         end
-        
-        % Take average of phase difference
-        phase_diff = inf;
-        if rise_time < N*dt
-            phase_diff = phase_diff_sum / phase_diff_n;
+
+        % Determine when steady state is reached
+        mavg_Fc = movmean(vecnorm(F_contact, 1),300);
+        if sum(mavg_Fc > ss_force_threshold) > 0
+            ss_index = find(mavg_Fc > ss_force_threshold,1) + 300;
+            rise_time = dt*ss_index;
+            phase_diff = mean(phase_diff_log(ss_index:end));
+        else
+            rise_time = inf;
+            phase_diff = inf;
         end
 
         phase_diff_res(R_i, v_i) = phase_diff;
