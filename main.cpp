@@ -76,7 +76,9 @@ const float l_CD = sqrt(pow(0.032,2) + pow(0.061,2));
 const float l_DE = 0.096; 
 const float l_EHoop=  0.022; // SUBJECT TO CHANGE// HOOP CONTACT POINT!
 const float l_HoopG = 0.122 - l_EHoop; 
-const float H = 0.4; // NEED TO MEASURE;
+const float H = 0.33; // NEED TO MEASURE;
+const float l_Horn = 0.03; 
+const float l_Bone = 0.062493; 
 
 //jacobian calculation
 // given x_F, y_F 
@@ -151,7 +153,7 @@ void CurrentLoop()
     current_int1 += err_c1;                                                             // integrate error
     current_int1 = fmaxf( fminf(current_int1, current_int_max), -current_int_max);      // anti-windup
     float ff1 = R*current_des1 + k_t*velocity1;                                         // feedforward terms
-    duty_cycle1 = (ff1 + current_Kp*err_c1 + current_Ki*current_int1)/supply_voltage;   // PI current controller
+    duty_cycle1 = 0.6;//(ff1 + current_Kp*err_c1 + current_Ki*current_int1)/supply_voltage;   // PI current controller
     
     float absDuty1 = abs(duty_cycle1);
     if (absDuty1 > duty_max) {
@@ -164,6 +166,26 @@ void CurrentLoop()
         motorShield.motorAWrite(absDuty1, 0);
     }             
     prev_current_des1 = current_des1; 
+    
+    //current2     = -(((float(motorShield.readCurrentB())/65536.0f)*30.0f)-15.0f);       // measure current
+//velocity2 = encoderB.getVelocity() * PULSE_TO_RAD;                                  // measure velocity  
+    //float err_c2 = current_des2 - current2;                                             // current error
+    //current_int2 += err_c2;                                                             // integrate error
+    //current_int2 = fmaxf( fminf(current_int2, current_int_max), -current_int_max);      // anti-windup   
+    //float ff2 = R*current_des2 + k_t*velocity2;                                         // feedforward terms
+    //duty_cycle2 = (ff2 + current_Kp*err_c2 + current_Ki*current_int2)/supply_voltage;   // PI current controller
+    
+    //float absDuty2 = abs(duty_cycle2);
+//    if (absDuty2 > duty_max) {
+//        duty_cycle2 *= duty_max / absDuty2;
+//        absDuty2 = duty_max;
+//    }    
+//    if (duty_cycle2 < 0) { // backwards
+//        motorShield.motorBWrite(absDuty2, 1);
+//    } else { // forwards
+//        motorShield.motorBWrite(absDuty2, 0);
+//    }             
+//    prev_current_des2 = current_des2; 
     
 }
 
@@ -180,6 +202,19 @@ int main (void)
     // Continually get input from MATLAB and run experiments
     float input_params[NUM_INPUTS];
     pc.printf("%f",input_params[0]);
+    
+    
+    sarrusservo.calibrate(0.0005,45);
+    sarrusservo = 0; 
+    float current = sarrusservo.read();    
+    //pc.printf("%f", current);           // tell servo to go to position in variable 'pos'
+    wait(1);                       // waits 15ms for the servo to reach the position
+    sarrusservo = 1; 
+    current = sarrusservo.read(); 
+    //pc.printf("here"); 
+    //.printf("%f", current);
+      
+  
     
     while(1) {
         
@@ -222,8 +257,10 @@ int main (void)
         
             motorShield.motorAWrite(0, 0); //turn motor A off
             // motorShield.motorBWrite(0, 0); //turn motor B off
-            sarrusservo=0.5; //sets servo to midpoint
-            float angle2_prev = PI/2;
+            sarrusservo = 1; //sets servo to endpoint
+            float current_pos = sarrusservo.read(); 
+            pc.printf("%f", current_pos); 
+            float angle2_prev = PI;
             timer1 = t.read(); 
             
             // Run experiment
@@ -234,7 +271,7 @@ int main (void)
                 velocity1 = encoderA.getVelocity() * PULSE_TO_RAD;
 
                 // Servo current angle 
-                float angle2 = sarrusservo.read() * PI; 
+                angle2 = sarrusservo.read(); 
                 float dt = t.read() - timer1;
                 timer1 = t.read(); 
                 // Servo velocity
@@ -252,15 +289,25 @@ int main (void)
  
                 // Calculate the Jacobian 1 (from phi, theta to phi, h)
 
-                float h = H - 2*l_AB*cos(th2);
-                float dh = 2*l_AB*sin(th2)*dth2;
+                float h1 = cos(th2)*l_Bone; 
+                float r_servo = sin(th2)*l_Horn; 
+                float h2 = sqrt(pow(l_Bone,2)-pow(r_servo,2)); 
+                float h_between_legs = h1+h2+0.004;
+                float h = H - h_between_legs;
+                
+
+ 
+
+
+                
+                float dh = (l_Bone-0.5*pow((pow(l_Bone,2)- pow(l_Horn,2)*pow(sin(th2),2)),-0.5)*sin(th2)*cos(th2))*sin(th2)*dth2; 
                 float phi = th1;
                 float dphi = dth1;
 
 
                 // TODO: Are these correct ?????
                 float Jh_th1 = 0;
-                float Jh_th2 = 2*l_AB*sin(th2);
+                float Jh_th2 = (l_Bone-0.5*pow((pow(l_Bone,2)- pow(l_Horn,2)*pow(sin(th2),2)),-0.5)*sin(th2)*cos(th2))*sin(th2); 
                 float Jphi_th1 = 1;
                 float Jphi_th2 = 0;
 
@@ -269,7 +316,7 @@ int main (void)
 
                 // Calculate the Jacobian 2 (from phi,h to xHoop, yHoop) 
                 // These are really long and crazy - check the jacobian derivation in MATLAB code
-                float l_EG = l_EHoop + l_HoopG;
+                float l_EG = 0.122;
                 float coeff1 = 2.0*h*h*sqrt(abs(-pow(h,4) + 2.0*h*h*l_DE*l_DE + 2.0*h*h*l_EG*l_EG - pow(l_DE,4) + 2.0*l_DE*l_DE*l_EG*l_EG - pow(l_EG,4)));
                 float coeff2 = sqrt(abs((h + l_DE + l_EG)*(h + l_DE - l_EG)*(h - l_DE + l_EG)*(-h + l_DE + l_EG)));
                 float coeff3 = pow(h,4) - pow(l_DE,4) + 2.0*l_DE*l_DE*l_EG*l_EG - pow(l_EG,4);
@@ -345,16 +392,31 @@ int main (void)
                 // Calculate the inverse kinematics (joint positions and velocities) for desired joint angles              
                 float xHoop_inv = -rDesContact[0];
                 float yHoop_inv = rDesContact[1];                
-                float r = sqrt(pow(xHoop_inv,2) + pow(yHoop_inv,2) );
-                float gamma = abs(acos(r/l_HoopG)); 
-                float alpha = 3.14159f-gamma; 
-                float h_des1 = cos(alpha)*(l_EHoop + l_HoopG); 
-                float straight_edge = sin(alpha)*(l_EHoop + l_HoopG); 
-                float h_des2 = sqrt(pow(straight_edge,2) + pow(l_DE,2)); 
+                float r = (sqrt(pow(xHoop_inv,2) + pow(yHoop_inv,2))) - 0.018; // -0.018 offset
+                pc.printf("r");
+                pc.printf("%f",r); 
+                
+                
+                float h_des1 = sqrt(pow(l_EG,2)-pow(r,2)); 
+                float h_des2 = sqrt(pow(l_DE,2)-pow(r,2));
+                  
                 float h_des = h_des1 + h_des2; 
-                float th2_des = acos((H-h_des)/(2*l_AB)); 
+                float h_servo = H -h_des-0.08; 
+               //pc.printf("h_des");
+               //pc.printf("%f", h_des); 
+               //pc.printf("h_servo");
+               //pc.printf("%f",h_servo);
+                
+                float th2_des = acos((pow(h_servo,2)+pow(l_Horn,2)-pow(l_Bone,2))/(2*l_Horn*h_servo));
+                //float th2_des = (r - 0.036)/(0.053/PI);
+                float Acos  = (pow(h_servo,2)+pow(l_Horn,2)-pow(l_Bone,2))/(2*l_Horn*h_servo);
+                //pc.printf("th2_des"); 
+                //pc.printf("%f", th2_des);
+                
+               
                 float th1_des = -(3.14159f/2.0f) + atan2(yHoop_inv,xHoop_inv); 
                 
+
                 float dd = (Jx_th1*Jy_th2 - Jx_th2*Jy_th1);
         
                 // Calculate error variables
@@ -363,16 +425,18 @@ int main (void)
                 float de_x = vDesContact[0] - dxHoop;
                 float de_y = vDesContact[1] - dyHoop;
         
-                // Calculate virtual force on foot
+                // Calculate virtual force on foot h
                 float fx = K_xx*e_x + K_xy*e_y + D_xx*de_x + D_xy*de_y;
                 float fy = K_xy*e_x + K_yy*e_y + D_xy*de_x + D_yy*de_y;
                 float fxd = D_xx*de_x + D_xy*de_y;
                 float fyd = D_xy*de_x + D_yy*de_y;
                 
                 current_des1 = (Jx_th1*fxd + Jy_th1*fyd)/k_t;
-                current_des2 = (Jy_th2*fy + Jx_th2*fx)/k_t;
-                
-                sarrusservo = th2_des/PI; 
+                current_des2 = (Jy_th2*fy + Jx_th2*fx)/k_t; 
+                sarrusservo= (PI-th2_des-(PI/12))/PI;
+                float servo_position = sarrusservo.read(); 
+                //pc.printf("current_servo");
+                //pc.printf("%f", servo_position); 
 
                 // Form output to send to MATLAB     
                 float output_data[NUM_OUTPUTS];
@@ -390,7 +454,7 @@ int main (void)
                 output_data[8] = current2;
                 output_data[9] = current_des2;
                 output_data[10]= h_duty_cycle;
-                // hoop state
+                // foot state
                 output_data[11] = xHoop;
                 output_data[12] = yHoop;
                 output_data[13] = dxHoop;

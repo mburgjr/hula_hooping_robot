@@ -12,10 +12,10 @@ R_person = 0.03; % m
 
 % Spiral input
 % NOTE: Keep upper / lower equal for simple ellipse
-a_upper = R_hoop/5; % m     Initial radius on x-axis
-a_lower = R_hoop/5; % m     Final radius on x-axis
-b_upper = R_hoop/5; % m     Initial radius on y-axis
-b_lower = R_hoop/5; % m     Final radius on y-axis
+a_upper = 0.09; % m     Initial radius on x-axis
+a_lower = 0.03; % m     Final radius on x-axis
+b_upper = 0.09; % m     Initial radius on y-axis
+b_lower = 0.03; % m     Final radius on y-axis
 
 a_spiral = [a_upper a_lower];
 b_spiral = [b_upper b_lower];
@@ -26,9 +26,9 @@ h_init = 0;
 phi_init = 0;
 
 % Total experiment time is buffer,trajectory,buffer
-pre_buffer_time   = 10;
-traj_time         = 1;
-post_buffer_time  = 1;
+pre_buffer_time   = 3;
+traj_time         = 3;
+post_buffer_time  = 0;
 
 % Gains for impedance controller
 % If a gain is not being used in your Mbed code, set it to zero
