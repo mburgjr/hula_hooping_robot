@@ -165,26 +165,6 @@ void CurrentLoop()
     }             
     prev_current_des1 = current_des1; 
     
-    //current2     = -(((float(motorShield.readCurrentB())/65536.0f)*30.0f)-15.0f);       // measure current
-//velocity2 = encoderB.getVelocity() * PULSE_TO_RAD;                                  // measure velocity  
-    //float err_c2 = current_des2 - current2;                                             // current error
-    //current_int2 += err_c2;                                                             // integrate error
-    //current_int2 = fmaxf( fminf(current_int2, current_int_max), -current_int_max);      // anti-windup   
-    //float ff2 = R*current_des2 + k_t*velocity2;                                         // feedforward terms
-    //duty_cycle2 = (ff2 + current_Kp*err_c2 + current_Ki*current_int2)/supply_voltage;   // PI current controller
-    
-    //float absDuty2 = abs(duty_cycle2);
-//    if (absDuty2 > duty_max) {
-//        duty_cycle2 *= duty_max / absDuty2;
-//        absDuty2 = duty_max;
-//    }    
-//    if (duty_cycle2 < 0) { // backwards
-//        motorShield.motorBWrite(absDuty2, 1);
-//    } else { // forwards
-//        motorShield.motorBWrite(absDuty2, 0);
-//    }             
-//    prev_current_des2 = current_des2; 
-    
 }
 
 int main (void)
@@ -242,8 +222,8 @@ int main (void)
         
             motorShield.motorAWrite(0, 0); //turn motor A off
             // motorShield.motorBWrite(0, 0); //turn motor B off
-            sarrusservo.write(90); //sets servo to midpoint
-            float angle2_prev = 90;
+            sarrusservo=0.5; //sets servo to midpoint
+            float angle2_prev = PI/2;
             timer1 = t.read(); 
             
             // Run experiment
@@ -254,7 +234,7 @@ int main (void)
                 velocity1 = encoderA.getVelocity() * PULSE_TO_RAD;
 
                 // Servo current angle 
-                angle2 = sarrusservo.read(); 
+                float angle2 = sarrusservo.read() * PI; 
                 float dt = t.read() - timer1;
                 timer1 = t.read(); 
                 // Servo velocity
@@ -390,7 +370,9 @@ int main (void)
                 float fyd = D_xy*de_x + D_yy*de_y;
                 
                 current_des1 = (Jx_th1*fxd + Jy_th1*fyd)/k_t;
-                current_des2 = (Jy_th2*fy + Jx_th2*fx)/k_t; 
+                current_des2 = (Jy_th2*fy + Jx_th2*fx)/k_t;
+                
+                sarrusservo = th2_des/PI; 
 
                 // Form output to send to MATLAB     
                 float output_data[NUM_OUTPUTS];
@@ -408,7 +390,7 @@ int main (void)
                 output_data[8] = current2;
                 output_data[9] = current_des2;
                 output_data[10]= h_duty_cycle;
-                // foot state
+                // hoop state
                 output_data[11] = xHoop;
                 output_data[12] = yHoop;
                 output_data[13] = dxHoop;
