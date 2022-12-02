@@ -17,16 +17,16 @@ N = length(t);
 
 % Spiral input (if not sweeping)
 % NOTE: Keep upper / lower equal for simple ellipse
-a_upper = R_hoop/3; % m         Initial radius on x-axis
-a_lower = R_hoop/3; % m         Final radius on x-axis
-b_upper = R_hoop/3; % m         Initial radius on y-axis
-b_lower = R_hoop/3; % m         Final radius on y-axis
+a_upper = 3*R_hoop/2; % m         Initial radius on x-axis
+a_lower = 3*R_hoop/2; % m         Final radius on x-axis
+b_upper = 3*R_hoop/2; % m         Initial radius on y-axis
+b_lower = 3*R_hoop/2; % m         Final radius on y-axis
 dphi = 10*pi; % rad/sec         Spin speed
 
 % Run sweep
 sweep = true;
-R_sweep = R_hoop/10:R_hoop/80:R_hoop; % m
-dphi_sweep = 2*pi:0.125*pi:10*pi; % m/s
+R_sweep = R_hoop/10:R_hoop/20:R_hoop; % m
+dphi_sweep = 2*pi:0.25*pi:10*pi; % m/s
 
 if sweep
     phase_diff_res = zeros([length(R_sweep) length(dphi_sweep)]);
@@ -169,7 +169,7 @@ end
 %% Display
 if sweep == false
     
-    watch_sim = false;
+    watch_sim = true;
     if watch_sim
         % Plot trajectory
         hold on
@@ -276,20 +276,20 @@ else
     load('colormaps/greenred.mat');
 
     % Plot sweep graphs
-    figure, imagesc(R_sweep, dphi_sweep, rise_time_res');
+    figure, imagesc(R_sweep/R_hoop, dphi_sweep, rise_time_res');
     set(gca,'YDir','normal');
     colormap(greenred);
     colorbar;
-    xlabel('Trajectory radius (m)');
-    ylabel('Spin speed (rad/s)');
+    xlabel('Trajectory radius relative to hoop radius [/]');
+    ylabel('Spin speed [rad/s]');
     title('Rise time of hoop');
 
-    figure, imagesc(R_sweep, dphi_sweep, phase_diff_res');
+    figure, imagesc(R_sweep/R_hoop, dphi_sweep, phase_diff_res');
     set(gca,'YDir','normal');
     colormap(greenred);
     colorbar;
-    xlabel('Trajectory radius (m)');
-    ylabel('Spin speed (rad/s)');
+    xlabel('Trajectory radius relative to hoop radius [/]');
+    ylabel('Spin speed [rad/s]');
     title('Phase difference of hoop');
 end
 
