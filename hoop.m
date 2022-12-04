@@ -17,16 +17,16 @@ N = length(t);
 
 % Spiral input (if not sweeping)
 % NOTE: Keep upper / lower equal for simple ellipse
-a_upper = 3*R_hoop/2; % m         Initial radius on x-axis
-a_lower = 3*R_hoop/2; % m         Final radius on x-axis
-b_upper = 3*R_hoop/2; % m         Initial radius on y-axis
-b_lower = 3*R_hoop/2; % m         Final radius on y-axis
-dphi = 10*pi; % rad/sec         Spin speed
+a_upper = R_hoop; % m         Initial radius on x-axis
+a_lower = R_hoop/6; % m         Final radius on x-axis
+b_upper = R_hoop; % m         Initial radius on y-axis
+b_lower = R_hoop/6; % m         Final radius on y-axis
+dphi = 8*pi; % rad/sec         Spin speed
 
 % Run sweep
-sweep = true;
-R_sweep = R_hoop/10:R_hoop/20:R_hoop; % m
-dphi_sweep = 2*pi:0.25*pi:10*pi; % m/s
+sweep = false;
+R_sweep = R_hoop/10:R_hoop/80:R_hoop; % m
+dphi_sweep = 2*pi:0.125*pi:10*pi; % m/s
 
 if sweep
     phase_diff_res = zeros([length(R_sweep) length(dphi_sweep)]);
@@ -97,7 +97,8 @@ for R_i = 1:size(phase_diff_res, 1)
         ang_hoop = zeros([1 N]);    % [atan(y,x)] x N
         
         % Set initial state of hoop
-        p_hoop(1:2, 1) = p_person(:,1) + [-R_person + R_hoop; 0];
+        p_hoop(1:2, 1) = p_person(:,1) + [-R_person + R_hoop; 0]; % Start with 0 phase diff
+        % p_hoop(1:2, 1) = p_person(:,1) + [R_person - R_hoop; 0]; % Start with PI phase diff
         p_hoop(3, 1) = pi;
         ang_hoop(1) = 0;
         
@@ -282,7 +283,7 @@ else
     colorbar;
     xlabel('Trajectory radius relative to hoop radius [/]');
     ylabel('Spin speed [rad/s]');
-    title('Rise time of hoop');
+    title('Rise time of hoop [s]');
 
     figure, imagesc(R_sweep/R_hoop, dphi_sweep, phase_diff_res');
     set(gca,'YDir','normal');
@@ -290,7 +291,7 @@ else
     colorbar;
     xlabel('Trajectory radius relative to hoop radius [/]');
     ylabel('Spin speed [rad/s]');
-    title('Phase difference of hoop');
+    title('Phase difference between hoop and person [rad]');
 end
 
 
