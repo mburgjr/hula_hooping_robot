@@ -2,11 +2,11 @@
 
 % Hoop
 m_hoop = 0.5; % kg
-R_hoop = 0.24; % m
+R_hoop = 0.45; % m
 I_hoop = m_hoop*R_hoop^2;
 
 % Person
-R_person = 0.03; % m
+R_person = 0.15; % m
 mu = 0.05; % [/]
 
 % Simulation
@@ -17,11 +17,11 @@ N = length(t);
 
 % Spiral input (if not sweeping)
 % NOTE: Keep upper / lower equal for simple ellipse
-a_upper = R_hoop; % m         Initial radius on x-axis
-a_lower = R_hoop/6; % m         Final radius on x-axis
-b_upper = R_hoop; % m         Initial radius on y-axis
-b_lower = R_hoop/6; % m         Final radius on y-axis
-dphi = 8*pi; % rad/sec         Spin speed
+a_upper = R_hoop/2.5; % m         Initial radius on x-axis
+a_lower = R_hoop/12; % m         Final radius on x-axis
+b_upper = R_hoop/2.5; % m         Initial radius on y-axis
+b_lower = R_hoop/12; % m         Final radius on y-axis
+dphi = 12*pi; % rad/sec         Spin speed
 
 % Run sweep
 sweep = false;
@@ -97,8 +97,8 @@ for R_i = 1:size(phase_diff_res, 1)
         ang_hoop = zeros([1 N]);    % [atan(y,x)] x N
         
         % Set initial state of hoop
-        p_hoop(1:2, 1) = p_person(:,1) + [-R_person + R_hoop; 0]; % Start with 0 phase diff
-        % p_hoop(1:2, 1) = p_person(:,1) + [R_person - R_hoop; 0]; % Start with PI phase diff
+        % p_hoop(1:2, 1) = p_person(:,1) + [-R_person + R_hoop; 0]; % Start with 0 phase diff
+        p_hoop(1:2, 1) = p_person(:,1) + [R_person - R_hoop; 0]; % Start with PI phase diff
         p_hoop(3, 1) = pi;
         ang_hoop(1) = 0;
         
@@ -180,13 +180,13 @@ if sweep == false
         h_hoop = plot([0],[0],'b-','LineWidth',2);
         h_hoop_dot = plot([0],[0],'c.','MarkerSize',15);
         h_contact = plot([0],[0],'m-','LineWidth',2);
-        h_person = fill([0],[0],'r-','LineStyle','none');
+        h_person = plot([0],[0],'r-','LineWidth',2);
         
         xlabel('x'); ylabel('y');
         h_title = title('t=0.0s');
         
         axis equal
-        axis([-0.65 0.65 -0.65 0.65]);
+        axis([-1 1 -1 1]);
         
         % Precompute geometries
         th = 0:pi/50:2*pi;
@@ -206,12 +206,12 @@ if sweep == false
             % Plot bodies
             set(h_person,'XData', person_circle_x + p_person(1,i));
             set(h_person,'YData', person_circle_y + p_person(2,i));
-            
-            set(h_hoop,'XData', hoop_circle_x + p_hoop(1,i));
-            set(h_hoop,'YData', hoop_circle_y + p_hoop(2,i));
         
             set(h_hoop_dot,'XData', [p_hoop(1,i) + R_hoop*cos(p_hoop(3,i))]);
             set(h_hoop_dot,'YData', [p_hoop(2,i) + R_hoop*sin(p_hoop(3,i))]);
+            
+            set(h_hoop,'XData', hoop_circle_x + p_hoop(1,i));
+            set(h_hoop,'YData', hoop_circle_y + p_hoop(2,i));
         
             % Plot contact force
             normal = F_contact(:,i)/norm(F_contact(:,i));
@@ -281,7 +281,7 @@ else
     set(gca,'YDir','normal');
     colormap(greenred);
     colorbar;
-    xlabel('Trajectory radius relative to hoop radius [/]');
+    xlabel('Trajectory radius [/]');
     ylabel('Spin speed [rad/s]');
     title('Rise time of hoop [s]');
 
@@ -289,9 +289,9 @@ else
     set(gca,'YDir','normal');
     colormap(greenred);
     colorbar;
-    xlabel('Trajectory radius relative to hoop radius [/]');
+    xlabel('Trajectory radius [/]');
     ylabel('Spin speed [rad/s]');
-    title('Phase difference between hoop and person [rad]');
+    title('Phase difference [rad]');
 end
 
 
